@@ -1,3 +1,4 @@
+from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 import os
 import torch
 import torchaudio
@@ -8,15 +9,14 @@ import noisereduce as nr
 import tempfile
 from pydub import AudioSegment
 from concurrent.futures import ThreadPoolExecutor
-from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 from tqdm import tqdm
 
 
 class SpeechToTextModel:
     def __init__(self):
-        print("Loading model (facebook/wav2vec2-large-960h-lv60-self)...")
-        self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-large-960h-lv60-self")
-        self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-large-960h-lv60-self")
+        print("Loading model (facebook/wav2vec2-large-960h)...")
+        self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-large-960h")
+        self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-large-960h")
         self.model.eval()
         print("Model ready.")
 
@@ -61,3 +61,4 @@ class SpeechToTextModel:
         final_transcription = " ".join(transcriptions).strip()
         print("Transcription completed.")
         return final_transcription
+
