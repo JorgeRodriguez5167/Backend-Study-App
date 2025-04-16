@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from summurization import summarize_and_categorize
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
+from pydantic import BaseModel
 from sqlmodel import Session, select
 from models import User, Note
 from databases import engine, create_db_and_tables
@@ -9,10 +10,16 @@ from model import SpeechToTextModel
 import shutil
 from pathlib import Path
 
-app = FastAPI()
+# Create API router for all routes
+router = APIRouter()
+
+# Create the FastAPI app with docs URL configuration
+app = FastAPI(
+    docs_url="/",  # Serve Swagger UI at /docs/
+    redoc_url="/redoc"  # Serve ReDoc at /docs/redoc
+)
+
 stt_model = SpeechToTextModel()
-
-
 
 @app.on_event("startup")
 def on_startup():
@@ -22,7 +29,7 @@ def on_startup():
 # USERS
 # ------------------------
 
-@app.post("/users/", response_model=User)
+@router.post("/users/", response_model=User)
 def create_user(user: User):
     with Session(engine) as session:
         existing = session.exec(select(User).where(User.username == user.username)).first()
@@ -33,7 +40,7 @@ def create_user(user: User):
         session.refresh(user)
         return user
 
-@app.get("/users/", response_model=list[User])
+@router.get("/users/", response_model=list[User])
 def get_users():
     with Session(engine) as session:
         return session.exec(select(User)).all()
@@ -42,7 +49,7 @@ def get_users():
 # NOTES
 # ------------------------
 
-@app.post("/notes/", response_model=Note)
+@router.post("/notes/", response_model=Note)
 def create_note(note: Note):
     with Session(engine) as session:
         user = session.get(User, note.user_id)
@@ -53,7 +60,7 @@ def create_note(note: Note):
         session.refresh(note)
         return note
 
-@app.get("/notes/", response_model=list[Note])
+@router.get("/notes/", response_model=list[Note])
 def get_notes():
     with Session(engine) as session:
         return session.exec(select(Note)).all()
@@ -65,12 +72,12 @@ class SummaryResponse(BaseModel):
     summary: str
     category: str
 
-@app.post("/summarize/", response_model=SummaryResponse)
+@router.post("/summarize/", response_model=SummaryResponse)
 def summarize_text(req: TextRequest):
     summary, category = summarize_and_categorize(req.text)
     return {"summary": summary, "category": category}
 
-@app.post("/transcribe/")
+@router.post("/transcribe/")
 async def transcribe_audio(file: UploadFile = File(...)):
     temp_path = Path("temp_audio.wav")
 
@@ -81,3 +88,9 @@ async def transcribe_audio(file: UploadFile = File(...)):
     temp_path.unlink()  # Clean up
 
     return {"transcription": transcript}
+
+# Include the router with a prefix
+app.include_router(router, prefix="/docs")
+
+
+
