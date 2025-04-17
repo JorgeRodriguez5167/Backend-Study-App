@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from summurization import summarize_and_categorize
-from fastapi import FastAPI, HTTPException, APIRouter
+from fastapi import FastAPI, HTTPException, APIRouter, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from models import User, Note
@@ -11,11 +11,9 @@ import shutil
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 import os
+from fastapi.responses import JSONResponse
 
-# Create API router for all routes
-router = APIRouter()
-
-# Create the FastAPI app with docs URL configuration
+# Create the FastAPI app with standard configuration
 app = FastAPI()
 
 # Configure CORS
@@ -37,7 +35,7 @@ def on_startup():
 # USERS
 # ------------------------
 
-@router.post("/users/", response_model=User)
+@app.post("/users/", response_model=User)
 def create_user(user: User):
     with Session(engine) as session:
         existing = session.exec(select(User).where(User.username == user.username)).first()
@@ -48,7 +46,7 @@ def create_user(user: User):
         session.refresh(user)
         return user
 
-@router.get("/users/", response_model=list[User])
+@app.get("/users/", response_model=list[User])
 def get_users():
     with Session(engine) as session:
         return session.exec(select(User)).all()
@@ -57,7 +55,7 @@ def get_users():
 # NOTES
 # ------------------------
 
-@router.post("/notes/", response_model=Note)
+@app.post("/notes/", response_model=Note)
 def create_note(note: Note):
     with Session(engine) as session:
         user = session.get(User, note.user_id)
@@ -68,7 +66,7 @@ def create_note(note: Note):
         session.refresh(note)
         return note
 
-@router.get("/notes/", response_model=list[Note])
+@app.get("/notes/", response_model=list[Note])
 def get_notes():
     with Session(engine) as session:
         return session.exec(select(Note)).all()
@@ -80,12 +78,18 @@ class SummaryResponse(BaseModel):
     summary: str
     category: str
 
-@router.post("/summarize/", response_model=SummaryResponse)
+@app.post("/summarize/", response_model=SummaryResponse)
 def summarize_text(req: TextRequest):
     summary, category = summarize_and_categorize(req.text)
     return {"summary": summary, "category": category}
 
-@router.post("/transcribe/")
+# Also add the same endpoint at /docs/summarize for consistency
+@app.post("/docs/summarize/", response_model=SummaryResponse)
+def summarize_text_docs(req: TextRequest):
+    summary, category = summarize_and_categorize(req.text)
+    return {"summary": summary, "category": category}
+
+@app.post("/transcribe/")
 async def transcribe_audio(file: UploadFile = File(...)):
     temp_path = Path("temp_audio.wav")
 
@@ -97,8 +101,10 @@ async def transcribe_audio(file: UploadFile = File(...)):
 
     return {"transcription": transcript}
 
-# Include the router with the prefix you want
-app.include_router(router, prefix="/docs")
+# Add a root endpoint for testing
+@app.get("/")
+def read_root():
+    return {"message": "API is running. Try endpoints like /summarize, /users, /notes, etc."}
 
 # For Railway deployment
 if __name__ == "__main__":
