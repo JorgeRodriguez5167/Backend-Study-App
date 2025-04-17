@@ -23,7 +23,7 @@ app = FastAPI(
 
 # Initialize STT model with optional env override
 model_id = os.getenv("MODEL_ID", "facebook/wav2vec2-large-960h-lv60-self")
-stt_model = SpeechToTextModel(model_name=model_id)
+stt_model = SpeechToTextModel(model_id)
 
 @router.on_event("startup")
 def on_startup():
