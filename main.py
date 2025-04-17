@@ -1,27 +1,29 @@
 from pydantic import BaseModel
 from summurization import summarize_and_categorize
-from fastapi import FastAPI, HTTPException, APIRouter
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, APIRouter, UploadFile, File
 from sqlmodel import Session, select
 from models import User, Note
 from databases import engine, create_db_and_tables
-from fastapi import FastAPI, UploadFile, File
 from model import SpeechToTextModel
 import shutil
 from pathlib import Path
+import os
+import tempfile
 
 # Create API router for all routes
 router = APIRouter()
 
 # Create the FastAPI app with docs URL configuration
 app = FastAPI(
-    docs_url="/",  # Serve Swagger UI at /docs/
-    redoc_url="/redoc"  # Serve ReDoc at /docs/redoc
+    docs_url="/",  # Serve Swagger UI at /
+    redoc_url="/redoc"  # Serve ReDoc at /redoc
 )
 
-stt_model = SpeechToTextModel()
+# Read model ID from environment variable for deployment
+model_id = os.getenv("MODEL_ID", "facebook/wav2vec2-large-960h-lv60-self")
+stt_model = SpeechToTextModel(model_id=model_id)
 
-@app.on_event("startup")
+@router.on_event("startup")
 def on_startup():
     create_db_and_tables()
 
@@ -64,7 +66,11 @@ def create_note(note: Note):
 def get_notes():
     with Session(engine) as session:
         return session.exec(select(Note)).all()
-    
+
+# ------------------------
+# SUMMARIZATION
+# ------------------------
+
 class TextRequest(BaseModel):
     text: str
 
@@ -77,22 +83,26 @@ def summarize_text(req: TextRequest):
     summary, category = summarize_and_categorize(req.text)
     return {"summary": summary, "category": category}
 
+# ------------------------
+# TRANSCRIPTION
+# ------------------------
+
 @router.post("/transcribe/")
 async def transcribe_audio(file: UploadFile = File(...)):
-    temp_path = Path("temp_audio.wav")
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+            shutil.copyfileobj(file.file, temp_audio)
+            temp_audio_path = temp_audio.name
 
-    with temp_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        transcript = stt_model.transcribe(temp_audio_path)
+        os.remove(temp_audio_path)
+        return {"transcription": transcript}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
-    transcript = stt_model.transcribe(str(temp_path))
-    temp_path.unlink()  # Clean up
-
-    return {"transcription": transcript}
-
-# Include the router with a prefix
+# Mount routes
 app.include_router(router, prefix="/docs")
-
-
 
 
 
