@@ -1,15 +1,15 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, APIRouter, UploadFile, File, Query, HTTPException
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+import shutil, tempfile
 from pathlib import Path
-import tempfile
-import shutil
-import logging
 from model import SpeechToTextModel
 
-logging.basicConfig(level=logging.INFO)
-
-app = FastAPI()
+app = FastAPI(
+    title="Study Assistant API",
+    description="Transcribes and summarizes audio notes",
+    version="1.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,32 +19,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+router = APIRouter()
 stt_model = SpeechToTextModel("base")
 
-@app.post("/transcribe")
+@router.post("/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),
     stream: bool = Query(False)
 ):
-    logging.info(f"[DEBUG] Received file: {file.filename}, type: {file.content_type}, stream={stream}")
-
+    print(f"[DEBUG] Received file: {file.filename}, type: {file.content_type}, stream={stream}")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
-    suffix = Path(file.filename).suffix
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        temp_path = Path(tmp.name)
-
     try:
-        transcript = stt_model.transcribe(str(temp_path))
-        logging.info(f"[DEBUG] Transcript: {transcript[:80]}...")
+        suffix = Path(file.filename).suffix or ".wav"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            temp_path = Path(tmp.name)
+
+        if stream:
+            def generate():
+                for chunk in stt_model.transcribe_stream(str(temp_path)):
+                    yield chunk
+                temp_path.unlink()
+
+            return StreamingResponse(generate(), media_type="text/plain")
+
+        else:
+            transcript = stt_model.transcribe(str(temp_path))
+            temp_path.unlink()
+            return JSONResponse({"transcription": transcript})
+
     except Exception as e:
-        logging.error(f"[ERROR] Transcription failed: {e}")
-        raise HTTPException(status_code=500, detail="Transcription failed")
-    finally:
-        temp_path.unlink()
+        print(f"[ERROR] Transcription error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    return JSONResponse({"transcription": transcript})
-
-
+app.include_router(router)
