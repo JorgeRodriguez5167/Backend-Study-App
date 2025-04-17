@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import shutil, tempfile
 from pathlib import Path
 from model import SpeechToTextModel
+from pydub import AudioSegment
+import os
 
 app = FastAPI(
     title="Study Assistant API",
@@ -37,6 +39,14 @@ async def transcribe_audio(
             shutil.copyfileobj(file.file, tmp)
             temp_path = Path(tmp.name)
 
+        # Convert to .wav if needed
+        if suffix != ".wav":
+            wav_path = temp_path.with_suffix(".wav")
+            audio = AudioSegment.from_file(temp_path)
+            audio.export(wav_path, format="wav")
+            temp_path.unlink()  # Remove original temp file
+            temp_path = wav_path
+
         if stream:
             def generate():
                 for chunk in stt_model.transcribe_stream(str(temp_path)):
@@ -55,3 +65,4 @@ async def transcribe_audio(
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 app.include_router(router)
+
