@@ -1,11 +1,13 @@
-# PATCH: Fix Railway deployment compatibility (no streaming)
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import tempfile
 import shutil
+import logging
 from model import SpeechToTextModel
+
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
 
@@ -24,7 +26,7 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     stream: bool = Query(False)
 ):
-    print(f"[DEBUG] Received file: {file.filename}, type: {file.content_type}, stream={stream}")
+    logging.info(f"[DEBUG] Received file: {file.filename}, type: {file.content_type}, stream={stream}")
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
@@ -34,7 +36,15 @@ async def transcribe_audio(
         shutil.copyfileobj(file.file, tmp)
         temp_path = Path(tmp.name)
 
-    transcript = stt_model.transcribe(str(temp_path))
-    temp_path.unlink()
+    try:
+        transcript = stt_model.transcribe(str(temp_path))
+        logging.info(f"[DEBUG] Transcript: {transcript[:80]}...")
+    except Exception as e:
+        logging.error(f"[ERROR] Transcription failed: {e}")
+        raise HTTPException(status_code=500, detail="Transcription failed")
+    finally:
+        temp_path.unlink()
+
     return JSONResponse({"transcription": transcript})
+
 
