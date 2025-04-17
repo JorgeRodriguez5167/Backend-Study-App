@@ -61,3 +61,4 @@ class SpeechToTextModel:
         print("Transcription completed.")
         return final_transcription
 
+
