@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from summurization import summarize_and_categorize
-from fastapi import FastAPI, HTTPException, APIRouter, Request, Body
+from fastapi import FastAPI, HTTPException, APIRouter, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from models import User, Note
@@ -35,7 +35,6 @@ def on_startup():
 # USERS
 # ------------------------
 
-@app.post("/users", response_model=User)
 @app.post("/users/", response_model=User)
 def create_user(user: User):
     with Session(engine) as session:
@@ -47,7 +46,6 @@ def create_user(user: User):
         session.refresh(user)
         return user
 
-@app.get("/users", response_model=list[User])
 @app.get("/users/", response_model=list[User])
 def get_users():
     with Session(engine) as session:
@@ -57,7 +55,6 @@ def get_users():
 # NOTES
 # ------------------------
 
-@app.post("/notes", response_model=Note)
 @app.post("/notes/", response_model=Note)
 def create_note(note: Note):
     with Session(engine) as session:
@@ -69,7 +66,6 @@ def create_note(note: Note):
         session.refresh(note)
         return note
 
-@app.get("/notes", response_model=list[Note])
 @app.get("/notes/", response_model=list[Note])
 def get_notes():
     with Session(engine) as session:
@@ -82,19 +78,17 @@ class SummaryResponse(BaseModel):
     summary: str
     category: str
 
-@app.post("/summarize", response_model=SummaryResponse)
 @app.post("/summarize/", response_model=SummaryResponse)
 def summarize_text(req: TextRequest):
     summary, category = summarize_and_categorize(req.text)
     return {"summary": summary, "category": category}
 
-# Also provide a simple post option that doesn't require structured data
-@app.post("/summarize-text")
-def summarize_plain_text(text: str = Body(..., embed=True)):
-    summary, category = summarize_and_categorize(text)
+# Also add the same endpoint at /docs/summarize for consistency
+@app.post("/docs/summarize/", response_model=SummaryResponse)
+def summarize_text_docs(req: TextRequest):
+    summary, category = summarize_and_categorize(req.text)
     return {"summary": summary, "category": category}
 
-@app.post("/transcribe")
 @app.post("/transcribe/")
 async def transcribe_audio(file: UploadFile = File(...)):
     temp_path = Path("temp_audio.wav")
@@ -110,12 +104,12 @@ async def transcribe_audio(file: UploadFile = File(...)):
 # Add a root endpoint for testing
 @app.get("/")
 def read_root():
-    return {"message": "API is running. Available endpoints: /summarize, /summarize-text, /users, /notes, /transcribe"}
+    return {"message": "API is running. Try endpoints like /summarize, /users, /notes, etc."}
 
 # For Railway deployment
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8080))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
 
 
