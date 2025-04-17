@@ -1,27 +1,19 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
-from datetime import datetime
+from faster_whisper import WhisperModel
 
-class User(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    username: str
-    password: str
-    email: str
-    first_name: str
-    last_name: str
-    age: int
-    major: str
+class SpeechToTextModel:
+    def __init__(self, model_size_or_path="base"):
+        print(f"[INFO] Loading Whisper model: {model_size_or_path}")
+        self.model = WhisperModel(model_size_or_path, device="cpu", compute_type="int8")
 
-    notes: List["Note"] = Relationship(back_populates="user")
+    def transcribe(self, file_path: str) -> str:
+        print(f"[DEBUG] Transcribing file: {file_path}")
+        segments, _ = self.model.transcribe(file_path)
+        full_text = " ".join([segment.text for segment in segments])
+        print(f"[DEBUG] Transcription complete. Length: {len(full_text)} characters")
+        return full_text
 
-
-class Note(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    audio: str
-    transcription: str
-    summarized_notes: str
-    category: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-    user_id: int = Field(foreign_key="user.id")
-    user: Optional[User] = Relationship(back_populates="notes")
+    def transcribe_stream(self, file_path: str):
+        print(f"[DEBUG] Streaming transcription for file: {file_path}")
+        segments, _ = self.model.transcribe(file_path)
+        for segment in segments:
+            yield segment.text + " "
