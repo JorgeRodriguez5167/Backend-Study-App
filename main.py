@@ -14,10 +14,10 @@ from pathlib import Path
 router = APIRouter()
 
 # Create the FastAPI app with docs URL configuration
-app = FastAPI(
-    docs_url="/",  # Serve Swagger UI at /docs/
-    redoc_url="/redoc"  # Serve ReDoc at /docs/redoc
-)
+app = FastAPI( )
+
+# Mount all your endpoints at the root (or under /api if you prefer)
+app.include_router(router, prefix="")  
 
 stt_model = SpeechToTextModel()
 
