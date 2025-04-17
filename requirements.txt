@@ -1,8 +1,8 @@
-fastapi
-uvicorn
 python-multipart
-faster-whisper
 ffmpeg-python
+faster-whisper==0.10.0
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
 huggingface_hub[hf_xet]
 google-ai-generativelanguage==0.6.15
 google-api-core==2.24.2
