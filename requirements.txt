@@ -3,6 +3,7 @@ uvicorn
 python-multipart
 faster-whisper
 ffmpeg-python
+huggingface_hub[hf_xet]
 google-ai-generativelanguage==0.6.15
 google-api-core==2.24.2
 google-api-python-client==2.166.0
