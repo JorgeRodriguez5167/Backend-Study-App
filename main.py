@@ -1,3 +1,5 @@
+#main.py (Merged for Railway Production)
+
 from pydantic import BaseModel
 from summurization import summarize_and_categorize
 from fastapi import FastAPI, HTTPException, APIRouter, UploadFile, File
@@ -7,8 +9,8 @@ from databases import engine, create_db_and_tables
 from model import SpeechToTextModel
 import shutil
 from pathlib import Path
-import os
 import tempfile
+import os
 
 # Create API router for all routes
 router = APIRouter()
@@ -19,9 +21,9 @@ app = FastAPI(
     redoc_url="/redoc"  # Serve ReDoc at /redoc
 )
 
-# Read model ID from environment variable for deployment
+# Initialize STT model with optional env override
 model_id = os.getenv("MODEL_ID", "facebook/wav2vec2-large-960h-lv60-self")
-stt_model = SpeechToTextModel(model_id=model_id)
+stt_model = SpeechToTextModel(model_name=model_id)
 
 @router.on_event("startup")
 def on_startup():
@@ -30,7 +32,6 @@ def on_startup():
 # ------------------------
 # USERS
 # ------------------------
-
 @router.post("/users/", response_model=User)
 def create_user(user: User):
     with Session(engine) as session:
@@ -50,7 +51,6 @@ def get_users():
 # ------------------------
 # NOTES
 # ------------------------
-
 @router.post("/notes/", response_model=Note)
 def create_note(note: Note):
     with Session(engine) as session:
@@ -70,7 +70,6 @@ def get_notes():
 # ------------------------
 # SUMMARIZATION
 # ------------------------
-
 class TextRequest(BaseModel):
     text: str
 
@@ -86,7 +85,6 @@ def summarize_text(req: TextRequest):
 # ------------------------
 # TRANSCRIPTION
 # ------------------------
-
 @router.post("/transcribe/")
 async def transcribe_audio(file: UploadFile = File(...)):
     try:
@@ -96,12 +94,12 @@ async def transcribe_audio(file: UploadFile = File(...)):
 
         transcript = stt_model.transcribe(temp_audio_path)
         os.remove(temp_audio_path)
-        return {"transcription": transcript}
+        return {"transcription": transcript or "(No transcription found)"}
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
-# Mount routes
+# Include the router with a prefix
 app.include_router(router, prefix="/docs")
 
 
