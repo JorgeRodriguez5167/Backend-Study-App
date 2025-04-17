@@ -9,15 +9,23 @@ from fastapi import FastAPI, UploadFile, File
 from model import SpeechToTextModel
 import shutil
 from pathlib import Path
+from fastapi.middleware.cors import CORSMiddleware
+import os
 
 # Create API router for all routes
 router = APIRouter()
 
 # Create the FastAPI app with docs URL configuration
-app = FastAPI( )
+app = FastAPI()
 
-# Mount all your endpoints at the root (or under /api if you prefer)
-app.include_router(router, prefix="")  
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 stt_model = SpeechToTextModel()
 
@@ -89,8 +97,14 @@ async def transcribe_audio(file: UploadFile = File(...)):
 
     return {"transcription": transcript}
 
-# Include the router with a prefix
+# Include the router with the prefix you want
 app.include_router(router, prefix="/docs")
+
+# For Railway deployment
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
 
 
 
