@@ -1,31 +1,38 @@
-#main.py (Merged for Railway Production)
-
+from fastapi import FastAPI, HTTPException, APIRouter, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware  # Enable CORS
 from pydantic import BaseModel
 from summurization import summarize_and_categorize
-from fastapi import FastAPI, HTTPException, APIRouter, UploadFile, File
 from sqlmodel import Session, select
 from models import User, Note
 from databases import engine, create_db_and_tables
 from model import SpeechToTextModel
 import shutil
-from pathlib import Path
 import tempfile
 import os
 
 # Create API router for all routes
 router = APIRouter()
 
-# Create the FastAPI app with docs URL configuration
+# Initialize FastAPI app with custom docs URLs
 app = FastAPI(
-    docs_url="/",  # Serve Swagger UI at /
-    redoc_url="/redoc"  # Serve ReDoc at /redoc
+    docs_url="/",    # Serve Swagger UI at root ("/")
+    redoc_url="/redoc"
 )
 
-# Initialize STT model with optional env override
-model_id = os.getenv("MODEL_ID", "facebook/wav2vec2-large-960h-lv60-self")
-stt_model = SpeechToTextModel(model_id)
+# Enable CORS for all origins (allow frontend to call API)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@router.on_event("startup")
+# Initialize speech-to-text model (Wav2Vec2) with optional env override
+model_id = os.getenv("MODEL_ID", "facebook/wav2vec2-large-960h-lv60-self")
+stt_model = SpeechToTextModel(model_id)  # use model from local implementation
+
+@app.on_event("startup")
 def on_startup():
     create_db_and_tables()
 
@@ -87,20 +94,22 @@ def summarize_text(req: TextRequest):
 # ------------------------
 @router.post("/transcribe/")
 async def transcribe_audio(file: UploadFile = File(...)):
+    """Upload an audio file and return its transcription."""
     try:
+        # Save the uploaded file to a temporary WAV file for processing
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
             shutil.copyfileobj(file.file, temp_audio)
             temp_audio_path = temp_audio.name
-
+        # Transcribe audio using the STT model
         transcript = stt_model.transcribe(temp_audio_path)
+        # Clean up temporary file
         os.remove(temp_audio_path)
         return {"transcription": transcript or "(No transcription found)"}
-    
     except Exception as e:
+        # Handle any errors during transcription
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
-# Include the router with a prefix
+# Include all routes with a prefix (so API endpoints are under /docs)
 app.include_router(router, prefix="/docs")
-
 
 
