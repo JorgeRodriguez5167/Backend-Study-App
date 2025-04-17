@@ -1,11 +1,15 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException
+from fastapi import FastAPI, APIRouter, UploadFile, File, Query, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import shutil, tempfile
 from pathlib import Path
 from model import SpeechToTextModel
 
-app = FastAPI()
+app = FastAPI(
+    title="Study Assistant API",
+    description="Transcribes and summarizes audio notes",
+    version="1.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,9 +19,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+router = APIRouter()
 stt_model = SpeechToTextModel("base")
 
-@app.post("/transcribe")
+@router.post("/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),
     stream: bool = Query(False)
@@ -48,5 +53,7 @@ async def transcribe_audio(
     except Exception as e:
         print(f"[ERROR] Transcription error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+app.include_router(router)
 
 
