@@ -15,6 +15,33 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from typing import Optional, List
 from datetime import datetime
+import tempfile
+import logging
+from logging.handlers import RotatingFileHandler
+
+# Set up logging
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+# Configure root logger
+logging.basicConfig(
+    level=getattr(logging, log_level),
+    format=log_format,
+    handlers=[
+        # Console handler
+        logging.StreamHandler(),
+        # File handler with rotation
+        RotatingFileHandler(
+            os.environ.get("LOG_FILE", "app.log"),
+            maxBytes=10485760,  # 10MB
+            backupCount=3
+        )
+    ]
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
+logger.info(f"Starting application with log level: {log_level}")
 
 # Create the FastAPI app
 app = FastAPI(title="Study Assistant API")
@@ -34,7 +61,13 @@ stt_model = SpeechToTextModel()
 # Create database tables on startup
 @app.on_event("startup")
 def on_startup():
-    create_db_and_tables()
+    logger.info("Application startup: Creating database tables")
+    try:
+        create_db_and_tables()
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Database initialization error: {str(e)}")
+        raise
 
 # ----------------------
 # Request/Response Models
@@ -189,21 +222,38 @@ def get_user_notes(user_id: int):
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
     """Transcribe audio file"""
-    # Save uploaded file temporarily
-    temp_path = Path("temp_audio.wav")
+    # Use proper temporary file handling
     
-    with temp_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # Transcribe audio
     try:
-        transcript = stt_model.transcribe(str(temp_path))
-        temp_path.unlink()  # Clean up
-        return {"transcription": transcript}
+        # Create a named temporary file that will be automatically cleaned up
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+            # Copy the uploaded file to the temporary file
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = temp_file.name
+        
+        # Ensure the file exists and is readable
+        if not os.path.exists(temp_path):
+            raise HTTPException(status_code=500, detail="Failed to save uploaded file")
+            
+        # Log the file details
+        file_size = os.path.getsize(temp_path)
+        print(f"Processing audio file: {temp_path} (Size: {file_size} bytes)")
+        
+        # Transcribe audio
+        try:
+            transcript = stt_model.transcribe(temp_path)
+            # Clean up the temporary file
+            os.unlink(temp_path)
+            return {"transcription": transcript}
+        except Exception as e:
+            print(f"Transcription error: {str(e)}")
+            # Clean up on error
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            raise HTTPException(status_code=500, detail=f"Transcription error: {str(e)}")
     except Exception as e:
-        if temp_path.exists():
-            temp_path.unlink()
-        raise HTTPException(status_code=500, detail=f"Transcription error: {str(e)}")
+        print(f"File handling error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"File processing error: {str(e)}")
 
 # ----------------------
 # Summarization Endpoint
@@ -244,8 +294,28 @@ def read_root():
 # ----------------------
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False) 
+    try:
+        # Get configuration from environment
+        port = int(os.environ.get("PORT", 8080))
+        host = os.environ.get("HOST", "0.0.0.0")
+        reload = os.environ.get("RELOAD", "False").lower() == "true"
+        
+        # Log startup information
+        logger.info(f"Starting server on {host}:{port} (reload={reload})")
+        logger.info(f"Running in environment: {os.environ.get('ENVIRONMENT', 'development')}")
+        
+        # Run the application
+        import uvicorn
+        uvicorn.run(
+            "main:app", 
+            host=host, 
+            port=port, 
+            reload=reload,
+            log_level=log_level.lower()
+        )
+    except Exception as e:
+        logger.critical(f"Failed to start server: {str(e)}")
+        raise 
 
 
 
