@@ -1,21 +1,23 @@
 from pydantic import BaseModel
 from summurization import summarize_and_categorize
-from fastapi import FastAPI, HTTPException, APIRouter, Request
+from fastapi import FastAPI, HTTPException, Request, Body
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from models import User, Note
 from databases import engine, create_db_and_tables
 from fastapi import FastAPI, UploadFile, File
-# Import SpeechToTextModel conditionally to avoid errors when the package is not installed
+from model import SpeechToTextModel
 import shutil
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from fastapi.responses import JSONResponse
 import uvicorn
+from typing import Optional, List
+from datetime import datetime
 
-# Create the FastAPI app with standard configuration
-app = FastAPI()
+# Create the FastAPI app
+app = FastAPI(title="Study Assistant API")
 
 # Configure CORS
 app.add_middleware(
@@ -26,94 +28,52 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# Flag to track if speech-to-text is available
-speech_to_text_available = False
+# Initialize models
+stt_model = SpeechToTextModel()
 
-# Lazy load the model - don't initialize it at startup
-stt_model = None
-
-def get_stt_model():
-    global stt_model, speech_to_text_available
-    if not speech_to_text_available:
-        return None
-    
-    if stt_model is None:
-        try:
-            # Try to import and initialize the model
-            from model import SpeechToTextModel
-            stt_model = SpeechToTextModel()
-            print("Speech-to-text model initialized")
-        except ImportError:
-            print("Speech-to-text dependencies not available")
-            speech_to_text_available = False
-    return stt_model
-
-# Try to check if speech-to-text is available
-try:
-    from model import SpeechToTextModel
-    speech_to_text_available = True
-    print("Speech-to-text package is available")
-except ImportError:
-    speech_to_text_available = False
-    print("Speech-to-text package is NOT available - transcription endpoint will be limited")
-
+# Create database tables on startup
 @app.on_event("startup")
 def on_startup():
-    try:
-        print("=== Application starting up ===")
-        print(f"Environment: {os.environ.get('RAILWAY_ENVIRONMENT', 'local')}")
-        print(f"Port: {os.environ.get('PORT', '8080')}")
-        
-        # Create database tables
-        print("Creating database tables...")
-        create_db_and_tables()
-        print("Database tables created successfully")
-        
-        print("=== Startup completed successfully ===")
-    except Exception as e:
-        print(f"!!! ERROR DURING STARTUP: {str(e)} !!!")
-        # Don't raise the exception here, as it would prevent the app from starting
+    create_db_and_tables()
 
-# ------------------------
-# USERS
-# ------------------------
+# ----------------------
+# Request/Response Models
+# ----------------------
 
-@app.post("/users/", response_model=User)
-def create_user(user: User):
-    with Session(engine) as session:
-        existing = session.exec(select(User).where(User.username == user.username)).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Username already exists")
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-        return user
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    email: str
+    first_name: str
+    last_name: str
+    age: int
+    major: str
 
-@app.get("/users/", response_model=list[User])
-def get_users():
-    with Session(engine) as session:
-        return session.exec(select(User)).all()
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    first_name: str
+    last_name: str
+    age: int
+    major: str
 
-# ------------------------
-# NOTES
-# ------------------------
+class NoteCreate(BaseModel):
+    user_id: int
+    audio: str
+    transcription: Optional[str] = None
+    summarized_notes: Optional[str] = None
+    category: Optional[str] = None
 
-@app.post("/notes/", response_model=Note)
-def create_note(note: Note):
-    with Session(engine) as session:
-        user = session.get(User, note.user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        session.add(note)
-        session.commit()
-        session.refresh(note)
-        return note
+class NoteResponse(BaseModel):
+    id: int
+    user_id: int
+    audio: str
+    transcription: str
+    summarized_notes: str
+    category: str
+    created_at: datetime
 
-@app.get("/notes/", response_model=list[Note])
-def get_notes():
-    with Session(engine) as session:
-        return session.exec(select(Note)).all()
-    
 class TextRequest(BaseModel):
     text: str
 
@@ -121,79 +81,171 @@ class SummaryResponse(BaseModel):
     summary: str
     category: str
 
-@app.post("/summarize/", response_model=SummaryResponse)
-def summarize_text(req: TextRequest):
-    summary, category = summarize_and_categorize(req.text)
-    return {"summary": summary, "category": category}
+# ----------------------
+# User Endpoints
+# ----------------------
 
-# Also add the same endpoint at /docs/summarize for consistency
-@app.post("/docs/summarize/", response_model=SummaryResponse)
-def summarize_text_docs(req: TextRequest):
-    summary, category = summarize_and_categorize(req.text)
-    return {"summary": summary, "category": category}
+@app.post("/users", response_model=UserResponse)
+def create_user(user: UserCreate):
+    """Create a new user"""
+    with Session(engine) as session:
+        # Check if username already exists
+        existing = session.exec(select(User).where(User.username == user.username)).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        
+        # Create new user
+        db_user = User(
+            username=user.username,
+            password=user.password,  # In production, hash this password
+            email=user.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            age=user.age,
+            major=user.major
+        )
+        session.add(db_user)
+        session.commit()
+        session.refresh(db_user)
+        
+        return db_user
 
-@app.post("/transcribe/")
+@app.get("/users", response_model=List[UserResponse])
+def get_users():
+    """Get all users"""
+    with Session(engine) as session:
+        users = session.exec(select(User)).all()
+        return users
+
+@app.get("/users/{user_id}", response_model=UserResponse)
+def get_user(user_id: int):
+    """Get a specific user by ID"""
+    with Session(engine) as session:
+        user = session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user
+
+# ----------------------
+# Notes Endpoints
+# ----------------------
+
+@app.post("/notes", response_model=NoteResponse)
+def create_note(note: NoteCreate):
+    """Create a new note"""
+    with Session(engine) as session:
+        # Verify user exists
+        user = session.get(User, note.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Create new note
+        db_note = Note(
+            user_id=note.user_id,
+            audio=note.audio,
+            transcription=note.transcription or "",
+            summarized_notes=note.summarized_notes or "",
+            category=note.category or ""
+        )
+        session.add(db_note)
+        session.commit()
+        session.refresh(db_note)
+        
+        return db_note
+
+@app.get("/notes", response_model=List[NoteResponse])
+def get_notes():
+    """Get all notes"""
+    with Session(engine) as session:
+        notes = session.exec(select(Note)).all()
+        return notes
+
+@app.get("/notes/{note_id}", response_model=NoteResponse)
+def get_note(note_id: int):
+    """Get a specific note by ID"""
+    with Session(engine) as session:
+        note = session.get(Note, note_id)
+        if not note:
+            raise HTTPException(status_code=404, detail="Note not found")
+        return note
+
+@app.get("/users/{user_id}/notes", response_model=List[NoteResponse])
+def get_user_notes(user_id: int):
+    """Get all notes for a specific user"""
+    with Session(engine) as session:
+        # Verify user exists
+        user = session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get user's notes
+        notes = session.exec(select(Note).where(Note.user_id == user_id)).all()
+        return notes
+
+# ----------------------
+# Transcription Endpoint
+# ----------------------
+
+@app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
+    """Transcribe audio file"""
+    # Save uploaded file temporarily
+    temp_path = Path("temp_audio.wav")
+    
+    with temp_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Transcribe audio
     try:
-        if not speech_to_text_available:
-            return {
-                "error": "Speech-to-text functionality is currently disabled",
-                "message": "The required dependencies for speech-to-text have been temporarily disabled for deployment."
-            }
-            
-        temp_path = Path("temp_audio.wav")
-
-        with temp_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # Lazy load the model only when needed
-        model = get_stt_model()
-        if model is None:
-            return {
-                "error": "Speech-to-text model could not be initialized",
-                "message": "Unable to load the required model for transcription."
-            }
-            
-        transcript = model.transcribe(str(temp_path))
+        transcript = stt_model.transcribe(str(temp_path))
         temp_path.unlink()  # Clean up
-
         return {"transcription": transcript}
     except Exception as e:
-        return {"error": f"Transcription failed: {str(e)}"}
+        if temp_path.exists():
+            temp_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Transcription error: {str(e)}")
 
-# Add a root endpoint for testing
+# ----------------------
+# Summarization Endpoint
+# ----------------------
+
+@app.post("/summarize", response_model=SummaryResponse)
+def summarize_text(req: TextRequest):
+    """Summarize and categorize text"""
+    if not req.text or len(req.text.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    
+    summary, category = summarize_and_categorize(req.text)
+    return {"summary": summary, "category": category}
+
+# ----------------------
+# Root Endpoint
+# ----------------------
+
 @app.get("/")
 def read_root():
-    try:
-        # Log that the root endpoint was called
-        print("Root endpoint accessed")
-        # Return basic status info
-        return {
-            "status": "online",
-            "message": "API is running. Try endpoints like /summarize, /users, /notes, etc.",
-            "environment": os.environ.get("RAILWAY_ENVIRONMENT", "local"),
-            "speech_to_text_available": speech_to_text_available,
-            "endpoints": [
-                {"path": "/", "method": "GET", "description": "Root endpoint"},
-                {"path": "/users/", "method": "GET/POST", "description": "User management"},
-                {"path": "/notes/", "method": "GET/POST", "description": "Notes management"},
-                {"path": "/summarize/", "method": "POST", "description": "Text summarization"},
-                {"path": "/transcribe/", "method": "POST", "description": "Audio transcription" + (" (disabled)" if not speech_to_text_available else "")}
-            ]
-        }
-    except Exception as e:
-        print(f"Error in root endpoint: {str(e)}")
-        return {"error": f"Something went wrong: {str(e)}"}
+    """API root endpoint"""
+    return {
+        "name": "Study Assistant API",
+        "version": "1.0.0",
+        "endpoints": [
+            {"path": "/users", "methods": ["GET", "POST"]},
+            {"path": "/users/{user_id}", "methods": ["GET"]},
+            {"path": "/users/{user_id}/notes", "methods": ["GET"]},
+            {"path": "/notes", "methods": ["GET", "POST"]},
+            {"path": "/notes/{note_id}", "methods": ["GET"]},
+            {"path": "/transcribe", "methods": ["POST"]},
+            {"path": "/summarize", "methods": ["POST"]}
+        ]
+    }
 
-# For Railway deployment
+# ----------------------
+# Run the Application
+# ----------------------
+
 if __name__ == "__main__":
-    try:
-        print(f"Starting server on port {os.environ.get('PORT', '8080')}")
-        port = int(os.environ.get("PORT", 8080))
-        uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
-    except Exception as e:
-        print(f"!!! ERROR STARTING SERVER: {str(e)} !!!")
-        raise
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False) 
 
 
 
