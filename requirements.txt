@@ -4,9 +4,9 @@ wheel>=0.40.0
 pip>=23.0.0
 
 # Web framework and API
-fastapi==0.104.0
+fastapi==0.95.2
 uvicorn==0.23.2
-pydantic==2.4.2
+pydantic==1.10.8
 python-multipart==0.0.7
 
 # Database
