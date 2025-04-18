@@ -37,7 +37,20 @@ def get_stt_model():
 
 @app.on_event("startup")
 def on_startup():
-    create_db_and_tables()
+    try:
+        print("=== Application starting up ===")
+        print(f"Environment: {os.environ.get('RAILWAY_ENVIRONMENT', 'local')}")
+        print(f"Port: {os.environ.get('PORT', '8080')}")
+        
+        # Create database tables
+        print("Creating database tables...")
+        create_db_and_tables()
+        print("Database tables created successfully")
+        
+        print("=== Startup completed successfully ===")
+    except Exception as e:
+        print(f"!!! ERROR DURING STARTUP: {str(e)} !!!")
+        # Don't raise the exception here, as it would prevent the app from starting
 
 # ------------------------
 # USERS
@@ -117,12 +130,35 @@ async def transcribe_audio(file: UploadFile = File(...)):
 # Add a root endpoint for testing
 @app.get("/")
 def read_root():
-    return {"message": "API is running. Try endpoints like /summarize, /users, /notes, etc."}
+    try:
+        # Log that the root endpoint was called
+        print("Root endpoint accessed")
+        # Return basic status info
+        return {
+            "status": "online",
+            "message": "API is running. Try endpoints like /summarize, /users, /notes, etc.",
+            "environment": os.environ.get("RAILWAY_ENVIRONMENT", "local"),
+            "endpoints": [
+                {"path": "/", "method": "GET", "description": "Root endpoint"},
+                {"path": "/users/", "method": "GET/POST", "description": "User management"},
+                {"path": "/notes/", "method": "GET/POST", "description": "Notes management"},
+                {"path": "/summarize/", "method": "POST", "description": "Text summarization"},
+                {"path": "/transcribe/", "method": "POST", "description": "Audio transcription"}
+            ]
+        }
+    except Exception as e:
+        print(f"Error in root endpoint: {str(e)}")
+        return {"error": f"Something went wrong: {str(e)}"}
 
 # For Railway deployment
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    try:
+        print(f"Starting server on port {os.environ.get('PORT', '8080')}")
+        port = int(os.environ.get("PORT", 8080))
+        uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    except Exception as e:
+        print(f"!!! ERROR STARTING SERVER: {str(e)} !!!")
+        raise
 
 
 
