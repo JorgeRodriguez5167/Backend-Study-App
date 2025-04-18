@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 from models import User, Note
 from databases import engine, create_db_and_tables
 from fastapi import FastAPI, UploadFile, File
-from model import SpeechToTextModel
+# Import SpeechToTextModel conditionally to avoid errors when the package is not installed
 import shutil
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,14 +26,36 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
+# Flag to track if speech-to-text is available
+speech_to_text_available = False
+
 # Lazy load the model - don't initialize it at startup
 stt_model = None
 
 def get_stt_model():
-    global stt_model
+    global stt_model, speech_to_text_available
+    if not speech_to_text_available:
+        return None
+    
     if stt_model is None:
-        stt_model = SpeechToTextModel()
+        try:
+            # Try to import and initialize the model
+            from model import SpeechToTextModel
+            stt_model = SpeechToTextModel()
+            print("Speech-to-text model initialized")
+        except ImportError:
+            print("Speech-to-text dependencies not available")
+            speech_to_text_available = False
     return stt_model
+
+# Try to check if speech-to-text is available
+try:
+    from model import SpeechToTextModel
+    speech_to_text_available = True
+    print("Speech-to-text package is available")
+except ImportError:
+    speech_to_text_available = False
+    print("Speech-to-text package is NOT available - transcription endpoint will be limited")
 
 @app.on_event("startup")
 def on_startup():
@@ -113,6 +135,12 @@ def summarize_text_docs(req: TextRequest):
 @app.post("/transcribe/")
 async def transcribe_audio(file: UploadFile = File(...)):
     try:
+        if not speech_to_text_available:
+            return {
+                "error": "Speech-to-text functionality is currently disabled",
+                "message": "The required dependencies for speech-to-text have been temporarily disabled for deployment."
+            }
+            
         temp_path = Path("temp_audio.wav")
 
         with temp_path.open("wb") as buffer:
@@ -120,6 +148,12 @@ async def transcribe_audio(file: UploadFile = File(...)):
 
         # Lazy load the model only when needed
         model = get_stt_model()
+        if model is None:
+            return {
+                "error": "Speech-to-text model could not be initialized",
+                "message": "Unable to load the required model for transcription."
+            }
+            
         transcript = model.transcribe(str(temp_path))
         temp_path.unlink()  # Clean up
 
@@ -138,12 +172,13 @@ def read_root():
             "status": "online",
             "message": "API is running. Try endpoints like /summarize, /users, /notes, etc.",
             "environment": os.environ.get("RAILWAY_ENVIRONMENT", "local"),
+            "speech_to_text_available": speech_to_text_available,
             "endpoints": [
                 {"path": "/", "method": "GET", "description": "Root endpoint"},
                 {"path": "/users/", "method": "GET/POST", "description": "User management"},
                 {"path": "/notes/", "method": "GET/POST", "description": "Notes management"},
                 {"path": "/summarize/", "method": "POST", "description": "Text summarization"},
-                {"path": "/transcribe/", "method": "POST", "description": "Audio transcription"}
+                {"path": "/transcribe/", "method": "POST", "description": "Audio transcription" + (" (disabled)" if not speech_to_text_available else "")}
             ]
         }
     except Exception as e:
