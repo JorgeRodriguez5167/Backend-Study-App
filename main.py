@@ -26,7 +26,14 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-stt_model = SpeechToTextModel()
+# Lazy load the model - don't initialize it at startup
+stt_model = None
+
+def get_stt_model():
+    global stt_model
+    if stt_model is None:
+        stt_model = SpeechToTextModel()
+    return stt_model
 
 @app.on_event("startup")
 def on_startup():
@@ -92,15 +99,20 @@ def summarize_text_docs(req: TextRequest):
 
 @app.post("/transcribe/")
 async def transcribe_audio(file: UploadFile = File(...)):
-    temp_path = Path("temp_audio.wav")
+    try:
+        temp_path = Path("temp_audio.wav")
 
-    with temp_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        with temp_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    transcript = stt_model.transcribe(str(temp_path))
-    temp_path.unlink()  # Clean up
+        # Lazy load the model only when needed
+        model = get_stt_model()
+        transcript = model.transcribe(str(temp_path))
+        temp_path.unlink()  # Clean up
 
-    return {"transcription": transcript}
+        return {"transcription": transcript}
+    except Exception as e:
+        return {"error": f"Transcription failed: {str(e)}"}
 
 # Add a root endpoint for testing
 @app.get("/")
@@ -109,7 +121,6 @@ def read_root():
 
 # For Railway deployment
 if __name__ == "__main__":
-
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
 
