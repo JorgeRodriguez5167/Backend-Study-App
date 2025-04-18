@@ -26,27 +26,27 @@ googleapis-common-protos==1.69.2
 # Basic ML if needed
 numpy==1.24.4
 
-# Only uncomment these once the basic deployment is working
-# Speech processing dependencies
-# transformers==4.34.1
-# torch==2.0.1
-# torchaudio==2.0.2
-# faster-whisper==0.9.0
-# ctranslate2==3.17.1
-# onnxruntime==1.15.1
-# librosa==0.10.1
-# soundfile==0.12.1
-# pydub==0.25.1
-# noisereduce==3.0.0
-# sounddevice==0.4.6
-# ffmpeg-python==0.2.0
-# tqdm==4.66.1
-# scikit-learn==1.3.1
-# scipy==1.11.3
+Only uncomment these once the basic deployment is working
+Speech processing dependencies
+transformers==4.34.1
+torch==2.0.1
+torchaudio==2.0.2
+faster-whisper==0.9.0
+ctranslate2==3.17.1
+onnxruntime==1.15.1
+librosa==0.10.1
+soundfile==0.12.1
+pydub==0.25.1
+noisereduce==3.0.0
+sounddevice==0.4.6
+ffmpeg-python==0.2.0
+tqdm==4.66.1
+scikit-learn==1.3.1
+scipy==1.11.3
 
-# Other Google packages - only if needed
-# google-ai-generativelanguage==0.6.15
-# google-api-core==2.24.2
-# google-api-python-client==2.166.0
-# google-auth==2.38.0
-# google-auth-httplib2==0.2.0
+Other Google packages - only if needed
+google-ai-generativelanguage==0.6.15
+google-api-core==2.24.2
+google-api-python-client==2.166.0
+google-auth==2.38.0
+google-auth-httplib2==0.2.0
