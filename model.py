@@ -50,7 +50,7 @@ class SpeechToTextModel:
         return chunks
 
     def transcribe_chunk(self, chunk, sr):
-        self._load_model()  # Ensure model is loaded before using
+        self._load_model()  # Ensure model is loaded before using hola
         input_values = self.processor(chunk, sampling_rate=sr, return_tensors="pt", padding=True).input_values
         with torch.no_grad():
             logits = self.model(input_values).logits
