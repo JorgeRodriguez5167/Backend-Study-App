@@ -8,14 +8,9 @@ ENV PYTHONUNBUFFERED=1
 # Set workdir
 WORKDIR /app
 
-# System dependencies for audio processing and MySQL
+# System dependencies for audio processing
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    default-mysql-client \
-    default-libmysqlclient-dev \
-    pkg-config \
-    gcc \
-    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
@@ -26,7 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 COPY start.py .  
 
-# Expose port 8000
+# Expose port for Railway
 EXPOSE 8000
 
 # Use shell to ensure $PORT is interpreted correctly

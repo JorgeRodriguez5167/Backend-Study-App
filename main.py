@@ -25,8 +25,6 @@ from fastapi.responses import StreamingResponse
 from pathlib import Path
 from pydub import AudioSegment
 from fastapi import Query
-import time
-from sqlalchemy.exc import SQLAlchemyError
 
 # Set up logging
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -69,49 +67,14 @@ stt_model = SpeechToTextModel()
 
 # Create database tables on startup
 @app.on_event("startup")
-async def on_startup():
-    logger.info("Application startup: Initializing database connection")
-    max_retries = 5
-    retry_delay = 5  # seconds
-    
-    for attempt in range(max_retries):
-        try:
-            # Test database connection
-            with Session(engine) as session:
-                session.execute("SELECT 1")
-                logger.info("Database connection test successful")
-            
-            # Create tables
-            create_db_and_tables()
-            logger.info("Database tables created successfully")
-            break
-        except SQLAlchemyError as e:
-            logger.warning(f"Database connection attempt {attempt + 1}/{max_retries} failed: {str(e)}")
-            if attempt < max_retries - 1:
-                logger.info(f"Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-            else:
-                logger.error("Failed to connect to database after maximum retries")
-                # Don't raise the exception - let the application start anyway
-                break
-
-# Simple health check endpoint
-@app.get("/health")
-async def health_check():
-    """Simple health check endpoint"""
+def on_startup():
+    logger.info("Application startup: Creating database tables")
     try:
-        with Session(engine) as session:
-            session.execute("SELECT 1")
-            return {"status": "ok", "database": "connected"}
-    except SQLAlchemyError as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return {"status": "ok", "database": "disconnected"}
-
-# Root endpoint
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {"status": "ok", "message": "Study Assistant API is running"}
+        create_db_and_tables()
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Database initialization error: {str(e)}")
+        raise
 
 # ----------------------
 # Request/Response Models
@@ -337,8 +300,3 @@ def read_root():
             {"path": "/summarize", "methods": ["POST"]}
         ]
     }
-
-
-@app.get("/health")
-async def healthcheck():
-    return {"status": "ok"}
