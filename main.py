@@ -67,9 +67,15 @@ stt_model = SpeechToTextModel()
 
 # Create database tables on startup
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     logger.info("Application startup: Creating database tables")
     try:
+        # Test database connection
+        with Session(engine) as session:
+            session.execute("SELECT 1")
+            logger.info("Database connection test successful")
+        
+        # Create tables
         create_db_and_tables()
         logger.info("Database tables created successfully")
     except Exception as e:

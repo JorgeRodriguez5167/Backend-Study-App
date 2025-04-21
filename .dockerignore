@@ -9,20 +9,61 @@ __pycache__/
 *.so
 .Python
 env/
-venv/
-ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
 *.egg-info/
 .installed.cfg
 *.egg
 
+# Virtual Environment
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Local development
+.env
+.env.local
+.env.*.local
+
 # Database
-database.db
+*.db
+*.sqlite3
+
+# Cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# System files
+.DS_Store
+Thumbs.db
 
 # Environment variables - DO NOT include in Docker build
 .env
 
 # Misc
-.DS_Store
-.idea/
-.vscode/
 node_modules/ 

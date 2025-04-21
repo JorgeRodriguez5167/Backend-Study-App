@@ -19,10 +19,24 @@ def get_engine():
         # Railway provides the full database URL
         logger.info("Using Railway database URL")
         try:
+            # Use the internal URL for better performance within Railway
+            if "railway.internal" in DATABASE_URL:
+                logger.info("Using internal Railway database URL")
+                internal_url = DATABASE_URL
+            else:
+                # Convert public URL to internal URL
+                logger.info("Converting public URL to internal URL")
+                internal_url = DATABASE_URL.replace("hopper.proxy.rlwy.net:27018", "mysql.railway.internal:3306")
+            
             # Ensure the URL is properly formatted
-            if not DATABASE_URL.startswith("mysql://"):
-                DATABASE_URL = DATABASE_URL.replace("mysql://", "mysql+pymysql://")
-            engine = create_engine(DATABASE_URL, echo=True)
+            if not internal_url.startswith("mysql://"):
+                internal_url = internal_url.replace("mysql://", "mysql+pymysql://")
+            
+            # Add additional connection parameters
+            internal_url += "?charset=utf8mb4"
+            
+            logger.info(f"Connecting to database at: {internal_url}")
+            engine = create_engine(internal_url, echo=True, pool_pre_ping=True)
             logger.info("Successfully connected to Railway database")
             return engine
         except Exception as e:
@@ -40,11 +54,11 @@ def get_engine():
         encoded_password = quote_plus(MYSQL_PASSWORD)
         
         # Create MySQL connection URL with explicit TCP/IP connection
-        mysql_url = f"mysql+pymysql://{MYSQL_USER}:{encoded_password}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+        mysql_url = f"mysql+pymysql://{MYSQL_USER}:{encoded_password}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4"
         logger.info(f"Using local MySQL database at: {MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}")
         
         try:
-            engine = create_engine(mysql_url, echo=True)
+            engine = create_engine(mysql_url, echo=True, pool_pre_ping=True)
             logger.info("Successfully connected to local MySQL database")
             return engine
         except Exception as e:
