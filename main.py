@@ -300,3 +300,9 @@ def read_root():
             {"path": "/summarize", "methods": ["POST"]}
         ]
     }
+
+@app.get("/ping")
+def ping():
+    print("✅ /ping endpoint was called")
+    return {"message": "pong"}
+
