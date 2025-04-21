@@ -82,18 +82,17 @@ async def on_startup():
         logger.error(f"Database initialization error: {str(e)}")
         raise
 
-# Health check endpoint
+# Simple health check endpoint
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for Railway"""
-    try:
-        # Test database connection
-        with Session(engine) as session:
-            session.execute("SELECT 1")
-        return {"status": "healthy", "database": "connected"}
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Service unhealthy")
+    """Simple health check endpoint"""
+    return {"status": "ok"}
+
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"status": "ok", "message": "Study Assistant API is running"}
 
 # ----------------------
 # Request/Response Models

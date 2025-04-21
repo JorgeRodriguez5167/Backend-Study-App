@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
@@ -21,13 +24,17 @@ if __name__ == "__main__":
         reload = os.environ.get("RELOAD", "False").lower() == "true"
         
         logger.info(f"Starting server on {host}:{port}")
+        logger.info(f"Environment: {os.environ.get('ENVIRONMENT', 'development')}")
+        logger.info(f"Database URL: {os.environ.get('DATABASE_URL', 'Not set')}")
+        
         uvicorn.run(
             "main:app",
             host=host,
             port=port,
             reload=reload,
             log_level="info",
-            access_log=True
+            access_log=True,
+            workers=1
         )
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}")

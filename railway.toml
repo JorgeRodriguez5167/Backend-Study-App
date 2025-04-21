@@ -4,7 +4,8 @@ buildCommand = "pip install -r requirements.txt"
 
 [deploy]
 startCommand = "python start.py"
-healthcheckPath = "/health"
+healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 10 
+restartPolicyMaxRetries = 10
+startTimeout = 300 
