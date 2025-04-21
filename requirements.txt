@@ -12,7 +12,6 @@ python-multipart==0.0.7
 # Database
 sqlmodel==0.0.8
 sqlalchemy==1.4.41
-mysqlclient==2.2.4  # MySQL Python driver
 
 # HTTP requests
 requests==2.31.0

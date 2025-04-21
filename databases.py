@@ -1,28 +1,17 @@
 from sqlmodel import SQLModel, create_engine
 import os
-from dotenv import load_dotenv
+from pathlib import Path
 
-# Load environment variables
-load_dotenv()
+# Ensure data directory exists
+data_dir = Path(os.environ.get("DATA_DIR", "."))
+data_dir.mkdir(exist_ok=True)
 
-# Get database URL from Railway or use local MySQL configuration
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
-    # Railway provides the full database URL
-    print("Using Railway database URL")
-    engine = create_engine(DATABASE_URL, echo=True)
-else:
-    # Local MySQL configuration
-    MYSQL_USER = os.getenv("MYSQL_USER", "root")
-    MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
-    MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
-    MYSQL_PORT = os.getenv("MYSQL_PORT", "3306")
-    MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "study_app")
+# Use environment variable for database path or default to data directory
+sqlite_file_name = os.path.join(data_dir, os.environ.get("DATABASE_NAME", "database.db"))
+sqlite_url = f"sqlite:///{sqlite_file_name}"
 
-    # Create MySQL connection URL
-    mysql_url = f"mysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
-    print(f"Using local MySQL database at: {MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}")
-    engine = create_engine(mysql_url, echo=True)
+print(f"Using database at: {sqlite_file_name}")
+engine = create_engine(sqlite_url, echo=True, connect_args={"check_same_thread": False})
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

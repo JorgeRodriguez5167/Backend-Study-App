@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED=1
 # Set workdir
 WORKDIR /app
 
-# System dependencies for audio processing and MySQL
+# System dependencies for audio processing
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
@@ -22,7 +22,7 @@ COPY . .
 COPY start.py .  
 
 # Expose port for Railway
-EXPOSE $PORT
+EXPOSE 8000
 
 # Use shell to ensure $PORT is interpreted correctly
 CMD ["python", "start.py"]
