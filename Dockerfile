@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y \
     default-mysql-client \
     default-libmysqlclient-dev \
     pkg-config \
+    gcc \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
