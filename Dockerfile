@@ -26,8 +26,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 COPY start.py .  
 
-# Expose port for Railway
-EXPOSE $PORT
+# Expose port 8000
+EXPOSE 8000
 
 # Use shell to ensure $PORT is interpreted correctly
 CMD ["python", "start.py"]
