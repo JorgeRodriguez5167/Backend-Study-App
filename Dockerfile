@@ -8,9 +8,12 @@ ENV PYTHONUNBUFFERED=1
 # Set workdir
 WORKDIR /app
 
-# System dependencies for audio processing
+# System dependencies for audio processing and MySQL
 RUN apt-get update && apt-get install -y \
     ffmpeg \
+    default-mysql-client \
+    default-libmysqlclient-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies

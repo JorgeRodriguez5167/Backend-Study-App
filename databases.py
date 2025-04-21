@@ -1,17 +1,22 @@
 from sqlmodel import SQLModel, create_engine
 import os
-from pathlib import Path
+from dotenv import load_dotenv
 
-# Ensure data directory exists
-data_dir = Path(os.environ.get("DATA_DIR", "."))
-data_dir.mkdir(exist_ok=True)
+# Load environment variables
+load_dotenv()
 
-# Use environment variable for database path or default to data directory
-sqlite_file_name = os.path.join(data_dir, os.environ.get("DATABASE_NAME", "database.db"))
-sqlite_url = f"sqlite:///{sqlite_file_name}"
+# MySQL connection parameters
+MYSQL_USER = os.getenv("MYSQL_USER", "root")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
+MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
+MYSQL_PORT = os.getenv("MYSQL_PORT", "3306")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "study_app")
 
-print(f"Using database at: {sqlite_file_name}")
-engine = create_engine(sqlite_url, echo=True, connect_args={"check_same_thread": False})
+# Create MySQL connection URL
+mysql_url = f"mysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+
+print(f"Using MySQL database at: {MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}")
+engine = create_engine(mysql_url, echo=True)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
