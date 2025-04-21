@@ -27,7 +27,7 @@ COPY . .
 COPY start.py .  
 
 # Expose port for Railway
-EXPOSE 8000
+EXPOSE $PORT
 
 # Use shell to ensure $PORT is interpreted correctly
 CMD ["python", "start.py"]
