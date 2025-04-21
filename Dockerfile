@@ -11,9 +11,6 @@ WORKDIR /app
 # System dependencies for audio processing and MySQL
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    default-mysql-client \
-    default-libmysqlclient-dev \
-    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
@@ -25,7 +22,7 @@ COPY . .
 COPY start.py .  
 
 # Expose port for Railway
-EXPOSE 8000
+EXPOSE $PORT
 
 # Use shell to ensure $PORT is interpreted correctly
 CMD ["python", "start.py"]
