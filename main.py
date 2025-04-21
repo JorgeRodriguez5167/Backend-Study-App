@@ -337,3 +337,8 @@ def read_root():
             {"path": "/summarize", "methods": ["POST"]}
         ]
     }
+
+
+@app.get("/health")
+async def healthcheck():
+    return {"status": "ok"}
