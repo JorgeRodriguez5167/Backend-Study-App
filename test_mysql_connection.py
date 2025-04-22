@@ -11,6 +11,7 @@ import sys
 import logging
 import argparse
 from sqlalchemy import create_engine, text
+from datetime import date
 
 # Configure logging
 logging.basicConfig(
@@ -47,6 +48,45 @@ def test_mysql_connection(host, port, user, password, database):
             
             if tables:
                 logger.info(f"Available tables: {', '.join(tables)}")
+                
+                # Test user table columns
+                if 'user' in tables:
+                    result = conn.execute(text(
+                        "SHOW COLUMNS FROM user"
+                    ))
+                    columns = [row[0] for row in result]
+                    logger.info(f"User table columns: {', '.join(columns)}")
+                    
+                    # Check if date_of_birth column exists
+                    if 'date_of_birth' in columns:
+                        logger.info("date_of_birth column exists in user table")
+                    else:
+                        logger.warning("date_of_birth column does not exist in user table")
+                
+                # Test creating a sample user with date_of_birth
+                if 'user' in tables:
+                    # First, delete any test user that might exist
+                    conn.execute(text("DELETE FROM user WHERE username = 'testuser'"))
+                    
+                    # Create a test user with date_of_birth
+                    today = date.today().isoformat()
+                    conn.execute(text(
+                        f"""INSERT INTO user (username, password, email, first_name, last_name, age, date_of_birth, major, created_at) 
+                        VALUES ('testuser', 'password123', 'test@example.com', 'Test', 'User', 25, '{today}', 'Computer Science', NOW())"""
+                    ))
+                    logger.info("Successfully created test user with date_of_birth")
+                    
+                    # Read back the user to verify
+                    result = conn.execute(text("SELECT * FROM user WHERE username = 'testuser'"))
+                    user = result.fetchone()
+                    if user:
+                        logger.info(f"Retrieved test user: {user}")
+                    else:
+                        logger.warning("Failed to retrieve test user")
+                    
+                    # Clean up
+                    conn.execute(text("DELETE FROM user WHERE username = 'testuser'"))
+                    logger.info("Deleted test user")
             else:
                 logger.info("No tables found in the database")
                 
