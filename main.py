@@ -106,7 +106,6 @@ class UserResponse(BaseModel):
 
 class NoteCreate(BaseModel):
     user_id: int
-    audio: str
     transcription: Optional[str] = None
     summarized_notes: Optional[str] = None
     category: Optional[str] = None
@@ -114,7 +113,6 @@ class NoteCreate(BaseModel):
 class NoteResponse(BaseModel):
     id: int
     user_id: int
-    audio: str
     transcription: str
     summarized_notes: str
     category: str
@@ -312,7 +310,6 @@ def create_note(note: NoteCreate):
         # Create new note
         db_note = Note(
             user_id=note.user_id,
-            audio=note.audio,
             transcription=note.transcription or "",
             summarized_notes=note.summarized_notes or "",
             category=note.category or ""

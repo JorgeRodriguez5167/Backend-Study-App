@@ -19,7 +19,6 @@ class User(SQLModel, table=True):
 
 class Note(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    audio: str
     transcription: str
     summarized_notes: str
     category: str
