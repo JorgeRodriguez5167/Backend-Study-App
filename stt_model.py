@@ -1,10 +1,10 @@
 from faster_whisper import WhisperModel
 import os
 import wave
+import time
 
 class SpeechToTextModel:
     def __init__(self, model_size_or_path="base"):
-        # Determine device (GPU or CPU)
         device = "cpu"
         compute_type = "int8"
         try:
@@ -13,7 +13,6 @@ class SpeechToTextModel:
                 device = "cuda"
                 compute_type = "float16"
         except ImportError:
-            # If torch isn't available, check environment variable as fallback for GPU
             if os.environ.get("CUDA_VISIBLE_DEVICES") not in [None, "", "-1"]:
                 device = "cuda"
                 compute_type = "float16"
@@ -21,7 +20,6 @@ class SpeechToTextModel:
         print(f"[INFO] Loaded Whisper model '{model_size_or_path}' on {device} with compute_type={compute_type}")
 
     def _gen_transcription(self, file_path: str):
-        # Generate transcription in chunks if needed (internal use)
         try:
             wf = wave.open(file_path, 'rb')
             frame_rate = wf.getframerate()
@@ -32,10 +30,10 @@ class SpeechToTextModel:
             print(f"[ERROR] Failed to open audio file for duration: {e}")
             duration = 0.0
 
-        if duration and duration > 60:
+        if duration > 60:
             print(f"[DEBUG] Audio duration {duration:.2f}s exceeds 60s, using chunked transcription")
             chunk_length = 30.0  # seconds
-            overlap = 5.0        # seconds
+            overlap = 5.0
             chunk_frames = int(chunk_length * frame_rate)
             overlap_frames = int(overlap * frame_rate)
             step_frames = chunk_frames - overlap_frames
@@ -52,9 +50,11 @@ class SpeechToTextModel:
                 end_frame = min(start_frame + chunk_frames, n_frames)
                 wf.setpos(start_frame)
                 frames = wf.readframes(end_frame - start_frame)
+
                 import tempfile
                 with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_chunk:
                     chunk_path = tmp_chunk.name
+
                 chunk_wav = wave.open(chunk_path, 'wb')
                 chunk_wav.setnchannels(channels)
                 chunk_wav.setsampwidth(sampwidth)
@@ -64,6 +64,7 @@ class SpeechToTextModel:
 
                 segments, _ = self.model.transcribe(chunk_path)
                 chunk_text = " ".join([segment.text for segment in segments])
+
                 try:
                     os.remove(chunk_path)
                 except OSError:
@@ -80,10 +81,7 @@ class SpeechToTextModel:
                 else:
                     overlap_len = 0
 
-                # Log chunk processing info
                 print(f"[DEBUG] Processed chunk {chunk_index+1}: time {start_frame/frame_rate:.2f}-{end_frame/frame_rate:.2f}s, text length {len(chunk_text)} chars")
-                if overlap_len > 0:
-                    print(f"[DEBUG] Overlap of {overlap_len} chars removed from chunk {chunk_index+1}")
 
                 skipped = 0
                 for segment in segments:
@@ -97,27 +95,33 @@ class SpeechToTextModel:
                             skipped = overlap_len
                     if seg_text:
                         yield seg_text + " "
-                # Determine output text for this chunk (excluding overlapped part)
-                if overlap_len > 0:
-                    chunk_output_text = chunk_text[overlap_len:]
-                else:
-                    chunk_output_text = chunk_text
-                last_chunk_output = chunk_output_text
 
+                last_chunk_output = chunk_text[overlap_len:] if overlap_len > 0 else chunk_text
                 chunk_index += 1
                 if end_frame >= n_frames:
                     break
                 start_frame += step_frames
 
             wf.close()
+
         else:
             segments, _ = self.model.transcribe(file_path)
             for segment in segments:
                 yield segment.text + " "
 
-    def transcribe(self, file_path: str) -> str:
-        full_text = "".join([text_part for text_part in self._gen_transcription(file_path)])
-        return full_text.strip()
+    def transcribe(self, file_path: str, preview_chars: int = 10000):
+        """ Returns a tuple: (preview text, full transcription) """
+        collected = []
+        preview = ""
+        total_chars = 0
+        for text_part in self._gen_transcription(file_path):
+            collected.append(text_part)
+            if len(preview) < preview_chars:
+                preview += text_part
+            total_chars += len(text_part)
+
+        full = "".join(collected).strip()
+        return preview.strip(), full
 
     def transcribe_stream(self, file_path: str):
         for text_part in self._gen_transcription(file_path):
