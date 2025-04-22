@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 from datetime import datetime, date
+from sqlalchemy import Column, Text, String
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -19,8 +20,8 @@ class User(SQLModel, table=True):
 
 class Note(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    transcription: str
-    summarized_notes: str
+    transcription: str = Field(sa_column=Column(Text(length=16777215), nullable=False))  # MEDIUMTEXT (up to 16MB)
+    summarized_notes: str = Field(sa_column=Column(Text, nullable=False))  # TEXT (up to 64KB)
     category: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
