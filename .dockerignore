@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Database
+database.db
+
+# Environment variables - DO NOT include in Docker build
+.env
+
+# Misc
+.DS_Store
+.idea/
+.vscode/
+node_modules/ 
