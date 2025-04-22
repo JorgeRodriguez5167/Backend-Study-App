@@ -23,22 +23,26 @@ else:
     genai.configure(api_key=GOOGLE_API_KEY)
     logger.info("Gemini API Key configured successfully.")
 
-def get_notes_by_category(category: str):
-    """Retrieve all notes with the specified category from the database"""
+def get_notes_by_category(category: str, user_id: int):
+    """Retrieve notes with the specified category belonging to the specified user"""
     try:
         with Session(engine) as session:
             notes = session.exec(
-                select(Note).where(Note.category == category)
+                select(Note).where(
+                    (Note.category == category) & 
+                    (Note.user_id == user_id)
+                )
             ).all()
+            logger.info(f"Retrieved {len(notes)} notes for user {user_id} with category '{category}'")
             return notes
     except Exception as e:
-        logger.error(f"Error retrieving notes by category: {str(e)}")
+        logger.error(f"Error retrieving notes by category and user_id: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-def generate_study_guide(category: str):
-    """Generate a study guide from notes with the specified category"""
-    # Get all notes with the specified category
-    notes = get_notes_by_category(category)
+def generate_study_guide(category: str, user_id: int):
+    """Generate a study guide from notes with the specified category belonging to the user"""
+    # Get notes with the specified category belonging to the user
+    notes = get_notes_by_category(category, user_id)
     
     if not notes:
         return f"No notes found for category: {category}"
@@ -81,7 +85,7 @@ def generate_study_guide(category: str):
         if not response or not hasattr(response, 'text'):
             return "Failed to generate study guide. Please try again later."
         
-        logger.info(f"Successfully generated study guide for category: {category}")
+        logger.info(f"Successfully generated study guide for user {user_id}, category: {category}")
         return response.text
     
     except Exception as e:

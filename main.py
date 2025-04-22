@@ -138,6 +138,7 @@ class TokenResponse(BaseModel):
 
 class StudyGuideRequest(BaseModel):
     category: str
+    user_id: int
 
 class StudyGuideResponse(BaseModel):
     guide: str
@@ -440,14 +441,23 @@ def summarize_text(req: TextRequest):
 
 @app.post("/study-guide", response_model=StudyGuideResponse)
 def create_study_guide(req: StudyGuideRequest):
-    """Generate a study guide based on notes with a specific category"""
+    """Generate a study guide based on notes with a specific category for a specific user"""
     try:
         if not req.category or len(req.category.strip()) == 0:
             raise HTTPException(status_code=400, detail="Category cannot be empty")
         
-        logger.info(f"Generating study guide for category: {req.category}")
-        study_guide = generate_study_guide(req.category)
-        logger.info(f"Study guide generation completed for category: {req.category}")
+        if not req.user_id:
+            raise HTTPException(status_code=400, detail="User ID is required")
+        
+        # Verify user exists
+        with Session(engine) as session:
+            user = session.get(User, req.user_id)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+        
+        logger.info(f"Generating study guide for user {req.user_id}, category: {req.category}")
+        study_guide = generate_study_guide(req.category, req.user_id)
+        logger.info(f"Study guide generation completed for user {req.user_id}, category: {req.category}")
         
         return {"guide": study_guide, "category": req.category}
     except Exception as e:
