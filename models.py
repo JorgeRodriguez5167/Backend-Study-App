@@ -20,6 +20,7 @@ class User(SQLModel, table=True):
 
 class Note(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    title: str = Field(default="Untitled Note")
     transcription: str = Field(sa_column=Column(Text(length=16777215), nullable=False))  # MEDIUMTEXT (up to 16MB)
     summarized_notes: str = Field(sa_column=Column(Text, nullable=False))  # TEXT (up to 64KB)
     category: str
