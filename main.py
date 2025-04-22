@@ -91,9 +91,9 @@ class UserCreate(BaseModel):
     email: str
     first_name: str
     last_name: str
-    age: int
     major: str
-    date_of_birth: Optional[date] = None
+    date_of_birth: date
+    age: Optional[int] = None  # Age will be calculated from date_of_birth
 
 class UserResponse(BaseModel):
     id: int
@@ -160,8 +160,8 @@ class PasswordUpdateRequest(BaseModel):
 # ----------------------
 
 @app.post("/users", response_model=UserResponse)
-def create_user(user: UserCreate):
-    """Create a new user"""
+async def create_user(user: UserCreate):
+    """Create a new user with password hashing"""
     try:
         # Log the incoming request data (excluding password)
         safe_user_data = {**user.dict()}
@@ -181,20 +181,28 @@ def create_user(user: UserCreate):
                 logger.warning(f"Registration failed: Email '{user.email}' already registered")
                 raise HTTPException(status_code=400, detail="Email already registered")
             
+            # Hash the password
             try:
-                # Hash the password
-                logger.debug("Attempting to hash password")
+                logger.debug(f"Hashing password for user: {user.username}")
                 hashed_password = pwd_context.hash(user.password)
                 logger.debug("Password hashed successfully")
+            except Exception as e:
+                logger.error(f"Password hashing error: {str(e)}", exc_info=True)
+                raise HTTPException(status_code=500, detail="Error processing password")
+            
+            try:
+                # Calculate age from date of birth
+                today = date.today()
+                calculated_age = today.year - user.date_of_birth.year - ((today.month, today.day) < (user.date_of_birth.month, user.date_of_birth.day))
                 
-                # Create new user
+                # Create new user with hashed password
                 db_user = User(
                     username=user.username,
-                    password=hashed_password,  # Store hashed password
+                    password=hashed_password,
                     email=user.email,
                     first_name=user.first_name,
                     last_name=user.last_name,
-                    age=user.age,
+                    age=calculated_age,  # Use calculated age
                     major=user.major,
                     date_of_birth=user.date_of_birth
                 )
@@ -205,17 +213,17 @@ def create_user(user: UserCreate):
                 session.commit()
                 logger.debug("Session committed successfully")
                 session.refresh(db_user)
+                
                 logger.info(f"User created successfully: {user.username}")
                 return db_user
             except Exception as e:
-                logger.error(f"Error creating user in database: {str(e)}", exc_info=True)
+                error_msg = f"Database error: {str(e)}"
+                logger.error(f"Error creating user in database: {error_msg}", exc_info=True)
                 session.rollback()
-                raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+                raise HTTPException(status_code=500, detail=error_msg)
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        # Log any unexpected errors
         error_msg = f"Unexpected error in create_user: {str(e)}"
         logger.error(error_msg, exc_info=True)
         raise HTTPException(status_code=500, detail=error_msg)
@@ -243,6 +251,10 @@ def create_user_simple(user: UserCreate):
                 raise HTTPException(status_code=400, detail="Email already registered")
             
             try:
+                # Calculate age from date of birth
+                today = date.today()
+                calculated_age = today.year - user.date_of_birth.year - ((today.month, today.day) < (user.date_of_birth.month, user.date_of_birth.day))
+                
                 # Create new user with plain text password (not secure, for testing only)
                 db_user = User(
                     username=user.username,
@@ -250,7 +262,7 @@ def create_user_simple(user: UserCreate):
                     email=user.email,
                     first_name=user.first_name,
                     last_name=user.last_name,
-                    age=user.age,
+                    age=calculated_age,  # Use calculated age
                     major=user.major,
                     date_of_birth=user.date_of_birth
                 )
