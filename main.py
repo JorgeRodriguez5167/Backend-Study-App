@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from pydantic import BaseModel
-from summurization import summarize_and_categorize
+from summurization import summarize_and_categorize, summarize_text
 from fastapi import FastAPI, HTTPException, Request, Body, JSONResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -408,7 +408,7 @@ def get_transcription_progress(job_id: str):
 # ----------------------
 
 @app.post("/summarize", response_model=SummaryResponse)
-def summarize_text(req: TextRequest):
+def summarize_text_endpoint(req: TextRequest):
     """Summarize and categorize text"""
     if not req.text or len(req.text.strip()) == 0:
         raise HTTPException(status_code=400, detail="Text cannot be empty")
