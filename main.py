@@ -16,7 +16,7 @@ import os
 from fastapi.responses import JSONResponse
 import uvicorn
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 import tempfile
 import logging
 from logging.handlers import RotatingFileHandler
