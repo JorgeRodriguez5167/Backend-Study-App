@@ -3,7 +3,7 @@ load_dotenv()
 
 from pydantic import BaseModel
 from summurization import summarize_and_categorize
-from fastapi import FastAPI, HTTPException, Request, Body
+from fastapi import FastAPI, HTTPException, Request, Body, JSONResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from models import User, Note
@@ -380,50 +380,28 @@ async def transcribe_audio(
             shutil.copyfileobj(file.file, tmp)
             temp_path = Path(tmp.name)
 
-        # Convert to .wav and resample to 16kHz mono if needed
-        if suffix == ".wav":
-            try:
-                import wave
-                with wave.open(temp_path, 'rb') as wf:
-                    sr = wf.getframerate()
-                    ch = wf.getnchannels()
-                if sr != 16000 or ch != 1:
-                    audio = AudioSegment.from_file(temp_path)
-                    audio = audio.set_frame_rate(16000).set_channels(1)
-                    print(f"[DEBUG] Resampling audio to 16kHz mono for Whisper processing")
-                    audio.export(temp_path, format="wav")
-            except Exception as e:
-                audio = AudioSegment.from_file(temp_path)
-                if audio.frame_rate != 16000 or audio.channels != 1:
-                    audio = audio.set_frame_rate(16000).set_channels(1)
-                    print(f"[DEBUG] Resampling audio to 16kHz mono for Whisper processing")
-                audio.export(temp_path, format="wav")
-        else:
-            audio = AudioSegment.from_file(temp_path)
-            if audio.frame_rate != 16000 or audio.channels != 1:
-                audio = audio.set_frame_rate(16000).set_channels(1)
-                print(f"[DEBUG] Resampling audio to 16kHz mono for Whisper processing")
-            wav_path = temp_path.with_suffix(".wav")
-            audio.export(wav_path, format="wav")
-            temp_path.unlink()
-            temp_path = wav_path
+        job_id, first_chunk, _ = stt_model.transcribe_with_progress(str(temp_path))
 
-        if stream:
-            def generate():
-                for chunk in stt_model.transcribe_stream(str(temp_path)):
-                    yield chunk
-                temp_path.unlink()
-
-            return StreamingResponse(generate(), media_type="text/plain")
-
-        else:
-            transcript = stt_model.transcribe(str(temp_path))
-            temp_path.unlink()
-            return JSONResponse({"transcription": transcript})
+        return JSONResponse({
+            "job_id": job_id,
+            "transcription": first_chunk
+        })
 
     except Exception as e:
         print(f"[ERROR] Transcription error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+@app.get("/transcribe/progress/{job_id}")
+def get_transcription_progress(job_id: str):
+    job = stt_model.background_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return {
+        "done": job.get("done", False),
+        "transcription": "".join(job.get("chunks", []))
+    }
+
 
 # ----------------------
 # Summarization Endpoint
