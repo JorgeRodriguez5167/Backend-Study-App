@@ -25,6 +25,7 @@ from fastapi.responses import StreamingResponse
 from pathlib import Path
 from pydub import AudioSegment
 from fastapi import Query
+from passlib.context import CryptContext
 
 # Set up logging
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -64,6 +65,9 @@ app.add_middleware(
 
 # Initialize models
 stt_model = SpeechToTextModel()
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Create database tables on startup
 @app.on_event("startup")
@@ -121,6 +125,16 @@ class SummaryResponse(BaseModel):
     summary: str
     category: str
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: int
+    username: str
+
 # ----------------------
 # User Endpoints
 # ----------------------
@@ -130,25 +144,39 @@ def create_user(user: UserCreate):
     """Create a new user"""
     with Session(engine) as session:
         # Check if username already exists
-        existing = session.exec(select(User).where(User.username == user.username)).first()
-        if existing:
+        existing_username = session.exec(select(User).where(User.username == user.username)).first()
+        if existing_username:
             raise HTTPException(status_code=400, detail="Username already exists")
+        
+        # Check if email already exists
+        existing_email = session.exec(select(User).where(User.email == user.email)).first()
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Hash the password
+        hashed_password = pwd_context.hash(user.password)
         
         # Create new user
         db_user = User(
             username=user.username,
-            password=user.password,  # In production, hash this password
+            password=hashed_password,  # Store hashed password
             email=user.email,
             first_name=user.first_name,
             last_name=user.last_name,
             age=user.age,
             major=user.major
         )
-        session.add(db_user)
-        session.commit()
-        session.refresh(db_user)
         
-        return db_user
+        try:
+            session.add(db_user)
+            session.commit()
+            session.refresh(db_user)
+            logger.info(f"User created successfully: {user.username}")
+            return db_user
+        except Exception as e:
+            logger.error(f"Error creating user: {str(e)}")
+            session.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.get("/users", response_model=List[UserResponse])
 def get_users():
@@ -165,6 +193,28 @@ def get_user(user_id: int):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user
+
+@app.post("/login", response_model=TokenResponse)
+def login(user_credentials: UserLogin):
+    """Authenticate a user and return a token"""
+    with Session(engine) as session:
+        # Find user by username
+        user = session.exec(select(User).where(User.username == user_credentials.username)).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+        # Verify password
+        if not pwd_context.verify(user_credentials.password, user.password):
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+        # Create a simple token (in a real app, you'd use JWT)
+        # For now, we're just returning user details
+        return {
+            "access_token": f"user_{user.id}_{user.username}",  # This is a placeholder, not secure
+            "token_type": "bearer",
+            "user_id": user.id,
+            "username": user.username
+        }
 
 # ----------------------
 # Notes Endpoints
