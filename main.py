@@ -303,6 +303,23 @@ def read_root():
 
 @app.get("/ping")
 def ping():
-    print("✅ /ping endpoint was called")
-    return {"message": "pong"}
+    return {"ping": "pong"}
+
+@app.get("/health")
+def health():
+    """Health check endpoint for API and Database"""
+    health_status = {"api": "ok"}
+    
+    # Check database connection
+    try:
+        with Session(engine) as session:
+            # Simple query to test database connection
+            session.exec(select(User).limit(1)).all()
+            health_status["database"] = "ok"
+    except Exception as e:
+        logger.error(f"Database health check failed: {str(e)}")
+        health_status["database"] = "error"
+        health_status["database_error"] = str(e)
+    
+    return health_status
 
