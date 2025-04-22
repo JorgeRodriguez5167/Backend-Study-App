@@ -16,7 +16,7 @@ import os
 from fastapi.responses import JSONResponse
 import uvicorn
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 import tempfile
 import logging
 from logging.handlers import RotatingFileHandler
@@ -92,6 +92,7 @@ class UserCreate(BaseModel):
     last_name: str
     age: int
     major: str
+    date_of_birth: Optional[date] = None
 
 class UserResponse(BaseModel):
     id: int
@@ -101,6 +102,7 @@ class UserResponse(BaseModel):
     last_name: str
     age: int
     major: str
+    date_of_birth: Optional[date] = None
 
 class NoteCreate(BaseModel):
     user_id: int
@@ -175,7 +177,8 @@ def create_user(user: UserCreate):
                     first_name=user.first_name,
                     last_name=user.last_name,
                     age=user.age,
-                    major=user.major
+                    major=user.major,
+                    date_of_birth=user.date_of_birth
                 )
                 
                 logger.debug("Adding user to session")
@@ -230,7 +233,8 @@ def create_user_simple(user: UserCreate):
                     first_name=user.first_name,
                     last_name=user.last_name,
                     age=user.age,
-                    major=user.major
+                    major=user.major,
+                    date_of_birth=user.date_of_birth
                 )
                 
                 logger.debug("Adding user to session (simple)")
