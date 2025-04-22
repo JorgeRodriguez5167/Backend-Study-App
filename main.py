@@ -430,11 +430,19 @@ def summarize_text(req: TextRequest):
 @app.post("/study-guide", response_model=StudyGuideResponse)
 def create_study_guide(req: StudyGuideRequest):
     """Generate a study guide based on notes with a specific category"""
-    if not req.category or len(req.category.strip()) == 0:
-        raise HTTPException(status_code=400, detail="Category cannot be empty")
-    
-    study_guide = generate_study_guide(req.category)
-    return {"guide": study_guide, "category": req.category}
+    try:
+        if not req.category or len(req.category.strip()) == 0:
+            raise HTTPException(status_code=400, detail="Category cannot be empty")
+        
+        logger.info(f"Generating study guide for category: {req.category}")
+        study_guide = generate_study_guide(req.category)
+        logger.info(f"Study guide generation completed for category: {req.category}")
+        
+        return {"guide": study_guide, "category": req.category}
+    except Exception as e:
+        error_msg = f"Error generating study guide: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 # ----------------------
 # Root Endpoint

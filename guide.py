@@ -5,18 +5,23 @@ from models import Note
 from databases import engine
 from fastapi import HTTPException
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Configure the Gemini API with your API key
-try:
-    GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-    if not GOOGLE_API_KEY:
-        logger.warning("GOOGLE_API_KEY not found in environment variables")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+# Check if the key was loaded successfully
+if not GOOGLE_API_KEY:
+    logger.error("API key not found. Ensure the 'GOOGLE_API_KEY' environment variable is set correctly.")
+else:
     genai.configure(api_key=GOOGLE_API_KEY)
-except Exception as e:
-    logger.error(f"Error configuring Gemini API: {str(e)}")
+    logger.info("Gemini API Key configured successfully.")
 
 def get_notes_by_category(category: str):
     """Retrieve all notes with the specified category from the database"""
@@ -50,19 +55,24 @@ def generate_study_guide(category: str):
         return f"No content found in notes for category: {category}"
     
     try:
-        # Initialize the Gemini model
-        model = genai.GenerativeModel('gemini-pro')
+        # Initialize the Gemini model - using the latest flash model for efficiency
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
-        # Create the prompt
+        # Create the prompt with clear instructions
         prompt = f"""
         Create a comprehensive study guide based on the following content. 
-        Organize the information logically with clear sections, bullet points for key concepts, 
-        and examples where appropriate.
+        Structure your response with these elements:
+        1. Key Concepts: Bullet points of the main ideas and theories
+        2. Definitions: Important terms and their meanings
+        3. Examples: Practical applications or illustrations of concepts
+        4. Summary: A concise overview connecting the main points
         
         CONTENT:
+        ```
         {combined_content}
+        ```
         
-        Make a study guide for this.
+        Make a well-organized study guide for this content.
         """
         
         # Generate the study guide
@@ -71,6 +81,7 @@ def generate_study_guide(category: str):
         if not response or not hasattr(response, 'text'):
             return "Failed to generate study guide. Please try again later."
         
+        logger.info(f"Successfully generated study guide for category: {category}")
         return response.text
     
     except Exception as e:
