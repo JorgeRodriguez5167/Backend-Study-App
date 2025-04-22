@@ -3,7 +3,7 @@ load_dotenv()
 
 from pydantic import BaseModel
 from summurization import summarize_and_categorize, summarize_text
-from fastapi import FastAPI, HTTPException, Request, Body, JSONResponse
+from fastapi import FastAPI, HTTPException, Request, Body
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from models import User, Note
@@ -27,6 +27,7 @@ from pydub import AudioSegment
 from fastapi import Query
 from passlib.context import CryptContext
 from guide import generate_study_guide
+from fastapi.responses import JSONResponse
 
 # Set up logging
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
