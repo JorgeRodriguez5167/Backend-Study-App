@@ -26,6 +26,7 @@ from pathlib import Path
 from pydub import AudioSegment
 from fastapi import Query
 from passlib.context import CryptContext
+from guide import generate_study_guide
 
 # Set up logging
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -134,6 +135,13 @@ class TokenResponse(BaseModel):
     token_type: str
     user_id: int
     username: str
+
+class StudyGuideRequest(BaseModel):
+    category: str
+
+class StudyGuideResponse(BaseModel):
+    guide: str
+    category: str
 
 # ----------------------
 # User Endpoints
@@ -416,6 +424,19 @@ def summarize_text(req: TextRequest):
     return {"summary": summary, "category": category}
 
 # ----------------------
+# Study Guide Endpoint
+# ----------------------
+
+@app.post("/study-guide", response_model=StudyGuideResponse)
+def create_study_guide(req: StudyGuideRequest):
+    """Generate a study guide based on notes with a specific category"""
+    if not req.category or len(req.category.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Category cannot be empty")
+    
+    study_guide = generate_study_guide(req.category)
+    return {"guide": study_guide, "category": req.category}
+
+# ----------------------
 # Root Endpoint
 # ----------------------
 
@@ -432,7 +453,8 @@ def read_root():
             {"path": "/notes", "methods": ["GET", "POST"]},
             {"path": "/notes/{note_id}", "methods": ["GET"]},
             {"path": "/transcribe", "methods": ["POST"]},
-            {"path": "/summarize", "methods": ["POST"]}
+            {"path": "/summarize", "methods": ["POST"]},
+            {"path": "/study-guide", "methods": ["POST"]}
         ]
     }
 
