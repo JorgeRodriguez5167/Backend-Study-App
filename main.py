@@ -151,6 +151,10 @@ class UserUpdateRequest(BaseModel):
     last_name: Optional[str] = None
     email: Optional[str] = None
 
+class PasswordUpdateRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 # ----------------------
 # User Endpoints
 # ----------------------
@@ -344,6 +348,35 @@ def update_user(user_id: int, user_update: UserUpdateRequest):
         raise
     except Exception as e:
         error_msg = f"Unexpected error in update_user: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise HTTPException(status_code=500, detail=error_msg)
+
+@app.put("/users/{user_id}/password", response_model=dict)
+def update_password(user_id: int, password_update: PasswordUpdateRequest):
+    """Update a user's password"""
+    try:
+        with Session(engine) as session:
+            # Get the user
+            db_user = session.get(User, user_id)
+            if not db_user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            # Verify current password
+            if not pwd_context.verify(password_update.current_password, db_user.password):
+                raise HTTPException(status_code=401, detail="Current password is incorrect")
+            
+            # Hash and update new password
+            db_user.password = pwd_context.hash(password_update.new_password)
+            
+            # Save changes
+            session.add(db_user)
+            session.commit()
+            
+            return {"message": "Password updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error in update_password: {str(e)}"
         logger.error(error_msg, exc_info=True)
         raise HTTPException(status_code=500, detail=error_msg)
 
