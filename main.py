@@ -361,20 +361,9 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     stream: bool = Query(False)
 ):
-    # Debug: Confirm file received
     print(f"[DEBUG] Received file: {file.filename}, type: {file.content_type}, stream={stream}")
-    
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
-
-    # Debug: Check file size before processing
-    try:
-        contents = await file.read()
-        print(f"[DEBUG] File content size: {len(contents)} bytes")
-        await file.seek(0)  # Reset pointer so we can read it again
-    except Exception as e:
-        print(f"[ERROR] Could not read uploaded file: {e}")
-        raise HTTPException(status_code=400, detail="File read error")
 
     try:
         suffix = Path(file.filename).suffix or ".wav"
@@ -382,10 +371,30 @@ async def transcribe_audio(
             shutil.copyfileobj(file.file, tmp)
             temp_path = Path(tmp.name)
 
-        # Convert to .wav if needed
-        if suffix != ".wav":
-            wav_path = temp_path.with_suffix(".wav")
+        # Convert to .wav and resample to 16kHz mono if needed
+        if suffix == ".wav":
+            try:
+                import wave
+                with wave.open(temp_path, 'rb') as wf:
+                    sr = wf.getframerate()
+                    ch = wf.getnchannels()
+                if sr != 16000 or ch != 1:
+                    audio = AudioSegment.from_file(temp_path)
+                    audio = audio.set_frame_rate(16000).set_channels(1)
+                    print(f"[DEBUG] Resampling audio to 16kHz mono for Whisper processing")
+                    audio.export(temp_path, format="wav")
+            except Exception as e:
+                audio = AudioSegment.from_file(temp_path)
+                if audio.frame_rate != 16000 or audio.channels != 1:
+                    audio = audio.set_frame_rate(16000).set_channels(1)
+                    print(f"[DEBUG] Resampling audio to 16kHz mono for Whisper processing")
+                audio.export(temp_path, format="wav")
+        else:
             audio = AudioSegment.from_file(temp_path)
+            if audio.frame_rate != 16000 or audio.channels != 1:
+                audio = audio.set_frame_rate(16000).set_channels(1)
+                print(f"[DEBUG] Resampling audio to 16kHz mono for Whisper processing")
+            wav_path = temp_path.with_suffix(".wav")
             audio.export(wav_path, format="wav")
             temp_path.unlink()
             temp_path = wav_path
@@ -395,11 +404,13 @@ async def transcribe_audio(
                 for chunk in stt_model.transcribe_stream(str(temp_path)):
                     yield chunk
                 temp_path.unlink()
+
             return StreamingResponse(generate(), media_type="text/plain")
 
-        transcript = stt_model.transcribe(str(temp_path))
-        temp_path.unlink()
-        return JSONResponse({"transcription": transcript})
+        else:
+            transcript = stt_model.transcribe(str(temp_path))
+            temp_path.unlink()
+            return JSONResponse({"transcription": transcript})
 
     except Exception as e:
         print(f"[ERROR] Transcription error: {e}")
