@@ -231,6 +231,13 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     stream: bool = Query(False)
 ):
+    try:
+        contents = await file.read()
+        print(f"[DEBUG] File content size: {len(contents)} bytes")
+        file.file.seek(0)
+    except Exception as e:
+        print(f"[ERROR] Could not read uploaded file: {e}")
+
     print(f"[DEBUG] Received file: {file.filename}, type: {file.content_type}, stream={stream}")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
