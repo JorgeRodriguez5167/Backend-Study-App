@@ -16,7 +16,7 @@ import os
 from fastapi.responses import JSONResponse
 import uvicorn
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 import tempfile
 import logging
 from logging.handlers import RotatingFileHandler
@@ -25,6 +25,7 @@ from fastapi.responses import StreamingResponse
 from pathlib import Path
 from pydub import AudioSegment
 from fastapi import Query
+from passlib.context import CryptContext
 
 # Set up logging
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -65,6 +66,9 @@ app.add_middleware(
 # Initialize models
 stt_model = SpeechToTextModel()
 
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 # Create database tables on startup
 @app.on_event("startup")
 def on_startup():
@@ -88,6 +92,7 @@ class UserCreate(BaseModel):
     last_name: str
     age: int
     major: str
+    date_of_birth: Optional[date] = None
 
 class UserResponse(BaseModel):
     id: int
@@ -97,6 +102,7 @@ class UserResponse(BaseModel):
     last_name: str
     age: int
     major: str
+    date_of_birth: Optional[date] = None
 
 class NoteCreate(BaseModel):
     user_id: int
@@ -121,6 +127,16 @@ class SummaryResponse(BaseModel):
     summary: str
     category: str
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: int
+    username: str
+
 # ----------------------
 # User Endpoints
 # ----------------------
@@ -128,27 +144,119 @@ class SummaryResponse(BaseModel):
 @app.post("/users", response_model=UserResponse)
 def create_user(user: UserCreate):
     """Create a new user"""
-    with Session(engine) as session:
-        # Check if username already exists
-        existing = session.exec(select(User).where(User.username == user.username)).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Username already exists")
+    try:
+        # Log the incoming request data (excluding password)
+        safe_user_data = {**user.dict()}
+        safe_user_data["password"] = "***REDACTED***"
+        logger.info(f"User registration request received: {safe_user_data}")
         
-        # Create new user
-        db_user = User(
-            username=user.username,
-            password=user.password,  # In production, hash this password
-            email=user.email,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            age=user.age,
-            major=user.major
-        )
-        session.add(db_user)
-        session.commit()
-        session.refresh(db_user)
+        with Session(engine) as session:
+            # Check if username already exists
+            existing_username = session.exec(select(User).where(User.username == user.username)).first()
+            if existing_username:
+                logger.warning(f"Registration failed: Username '{user.username}' already exists")
+                raise HTTPException(status_code=400, detail="Username already exists")
+            
+            # Check if email already exists
+            existing_email = session.exec(select(User).where(User.email == user.email)).first()
+            if existing_email:
+                logger.warning(f"Registration failed: Email '{user.email}' already registered")
+                raise HTTPException(status_code=400, detail="Email already registered")
+            
+            try:
+                # Hash the password
+                logger.debug("Attempting to hash password")
+                hashed_password = pwd_context.hash(user.password)
+                logger.debug("Password hashed successfully")
+                
+                # Create new user
+                db_user = User(
+                    username=user.username,
+                    password=hashed_password,  # Store hashed password
+                    email=user.email,
+                    first_name=user.first_name,
+                    last_name=user.last_name,
+                    age=user.age,
+                    major=user.major,
+                    date_of_birth=user.date_of_birth
+                )
+                
+                logger.debug("Adding user to session")
+                session.add(db_user)
+                logger.debug("Committing session")
+                session.commit()
+                logger.debug("Session committed successfully")
+                session.refresh(db_user)
+                logger.info(f"User created successfully: {user.username}")
+                return db_user
+            except Exception as e:
+                logger.error(f"Error creating user in database: {str(e)}", exc_info=True)
+                session.rollback()
+                raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log any unexpected errors
+        error_msg = f"Unexpected error in create_user: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise HTTPException(status_code=500, detail=error_msg)
+
+@app.post("/register-simple", response_model=UserResponse)
+def create_user_simple(user: UserCreate):
+    """Create a new user without password hashing - for testing only"""
+    try:
+        # Log the incoming request data (excluding password)
+        safe_user_data = {**user.dict()}
+        safe_user_data["password"] = "***REDACTED***"
+        logger.info(f"Simple user registration request received: {safe_user_data}")
         
-        return db_user
+        with Session(engine) as session:
+            # Check if username already exists
+            existing_username = session.exec(select(User).where(User.username == user.username)).first()
+            if existing_username:
+                logger.warning(f"Simple registration failed: Username '{user.username}' already exists")
+                raise HTTPException(status_code=400, detail="Username already exists")
+            
+            # Check if email already exists
+            existing_email = session.exec(select(User).where(User.email == user.email)).first()
+            if existing_email:
+                logger.warning(f"Simple registration failed: Email '{user.email}' already registered")
+                raise HTTPException(status_code=400, detail="Email already registered")
+            
+            try:
+                # Create new user with plain text password (not secure, for testing only)
+                db_user = User(
+                    username=user.username,
+                    password=user.password,  # Plain text for testing
+                    email=user.email,
+                    first_name=user.first_name,
+                    last_name=user.last_name,
+                    age=user.age,
+                    major=user.major,
+                    date_of_birth=user.date_of_birth
+                )
+                
+                logger.debug("Adding user to session (simple)")
+                session.add(db_user)
+                logger.debug("Committing session (simple)")
+                session.commit()
+                logger.debug("Session committed successfully (simple)")
+                session.refresh(db_user)
+                
+                logger.info(f"User created successfully with simple method: {user.username}")
+                return db_user
+            except Exception as e:
+                error_msg = f"Database error: {str(e)}"
+                logger.error(f"Error creating user in database (simple): {error_msg}", exc_info=True)
+                session.rollback()
+                raise HTTPException(status_code=500, detail=error_msg)
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error in create_user_simple: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @app.get("/users", response_model=List[UserResponse])
 def get_users():
@@ -165,6 +273,28 @@ def get_user(user_id: int):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user
+
+@app.post("/login", response_model=TokenResponse)
+def login(user_credentials: UserLogin):
+    """Authenticate a user and return a token"""
+    with Session(engine) as session:
+        # Find user by username
+        user = session.exec(select(User).where(User.username == user_credentials.username)).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+        # Verify password
+        if not pwd_context.verify(user_credentials.password, user.password):
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+        # Create a simple token (in a real app, you'd use JWT)
+        # For now, we're just returning user details
+        return {
+            "access_token": f"user_{user.id}_{user.username}",  # This is a placeholder, not secure
+            "token_type": "bearer",
+            "user_id": user.id,
+            "username": user.username
+        }
 
 # ----------------------
 # Notes Endpoints
