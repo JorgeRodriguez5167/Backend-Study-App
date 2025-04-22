@@ -146,6 +146,11 @@ class StudyGuideResponse(BaseModel):
     guide: str
     category: str
 
+class UserUpdateRequest(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+
 # ----------------------
 # User Endpoints
 # ----------------------
@@ -304,6 +309,43 @@ def login(user_credentials: UserLogin):
             "user_id": user.id,
             "username": user.username
         }
+
+@app.put("/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, user_update: UserUpdateRequest):
+    """Update a user's profile information"""
+    try:
+        with Session(engine) as session:
+            # Get the user
+            db_user = session.get(User, user_id)
+            if not db_user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            # Check if email is being updated and if it's already taken
+            if user_update.email and user_update.email != db_user.email:
+                existing_email = session.exec(select(User).where(User.email == user_update.email)).first()
+                if existing_email:
+                    raise HTTPException(status_code=400, detail="Email already registered")
+            
+            # Update fields if provided
+            if user_update.first_name is not None:
+                db_user.first_name = user_update.first_name
+            if user_update.last_name is not None:
+                db_user.last_name = user_update.last_name
+            if user_update.email is not None:
+                db_user.email = user_update.email
+            
+            # Save changes
+            session.add(db_user)
+            session.commit()
+            session.refresh(db_user)
+            
+            return db_user
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error in update_user: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 # ----------------------
 # Notes Endpoints
