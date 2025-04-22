@@ -231,16 +231,20 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     stream: bool = Query(False)
 ):
+    # Debug: Confirm file received
+    print(f"[DEBUG] Received file: {file.filename}, type: {file.content_type}, stream={stream}")
+    
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file uploaded")
+
+    # Debug: Check file size before processing
     try:
         contents = await file.read()
         print(f"[DEBUG] File content size: {len(contents)} bytes")
-        file.file.seek(0)
+        await file.seek(0)  # Reset pointer so we can read it again
     except Exception as e:
         print(f"[ERROR] Could not read uploaded file: {e}")
-
-    print(f"[DEBUG] Received file: {file.filename}, type: {file.content_type}, stream={stream}")
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file uploaded")
+        raise HTTPException(status_code=400, detail="File read error")
 
     try:
         suffix = Path(file.filename).suffix or ".wav"
@@ -253,7 +257,7 @@ async def transcribe_audio(
             wav_path = temp_path.with_suffix(".wav")
             audio = AudioSegment.from_file(temp_path)
             audio.export(wav_path, format="wav")
-            temp_path.unlink()  # Remove original temp file
+            temp_path.unlink()
             temp_path = wav_path
 
         if stream:
@@ -261,18 +265,15 @@ async def transcribe_audio(
                 for chunk in stt_model.transcribe_stream(str(temp_path)):
                     yield chunk
                 temp_path.unlink()
-
             return StreamingResponse(generate(), media_type="text/plain")
 
-        else:
-            transcript = stt_model.transcribe(str(temp_path))
-            temp_path.unlink()
-            return JSONResponse({"transcription": transcript})
+        transcript = stt_model.transcribe(str(temp_path))
+        temp_path.unlink()
+        return JSONResponse({"transcription": transcript})
 
     except Exception as e:
         print(f"[ERROR] Transcription error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
 
 # ----------------------
 # Summarization Endpoint
