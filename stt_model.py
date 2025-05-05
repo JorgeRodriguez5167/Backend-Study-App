@@ -1,7 +1,8 @@
+#Rodolfo's stt model set up
 from faster_whisper import WhisperModel
 
 class SpeechToTextModel:
-    def __init__(self, model_size_or_path="base"):
+    def __init__(self, model_size_or_path="base"):  #keept the base model and using cpu
         self.model = WhisperModel(model_size_or_path, device="cpu", compute_type="int8")
 
     def transcribe(self, file_path: str) -> str:
