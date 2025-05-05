@@ -1,3 +1,4 @@
+#Rodolfo and Jorge's FastAPI set up
 from dotenv import load_dotenv
 load_dotenv()
 
