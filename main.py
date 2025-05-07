@@ -259,7 +259,7 @@ def create_user_simple(user: UserCreate):
                 # Create new user with plain text password (not secure, for testing only)
                 db_user = User(
                     username=user.username,
-                    password=user.password,  # Plain text for testing
+                    password=user.password,  
                     email=user.email,
                     first_name=user.first_name,
                     last_name=user.last_name,
@@ -289,6 +289,7 @@ def create_user_simple(user: UserCreate):
         logger.error(error_msg, exc_info=True)
         raise HTTPException(status_code=500, detail=error_msg)
 
+#API user registration and log in worked on by Jorge
 @app.get("/users", response_model=List[UserResponse])
 def get_users():
     """Get all users"""
@@ -318,7 +319,6 @@ def login(user_credentials: UserLogin):
         if not pwd_context.verify(user_credentials.password, user.password):
             raise HTTPException(status_code=401, detail="Invalid username or password")
         
-        # Create a simple token (in a real app, you'd use JWT)
         # For now, we're just returning user details
         return {
             "access_token": f"user_{user.id}_{user.username}",  # This is a placeholder, not secure
@@ -396,7 +396,7 @@ def update_password(user_id: int, password_update: PasswordUpdateRequest):
 # ----------------------
 # Notes Endpoints
 # ----------------------
-
+#Note and Study guide API and logic by Jorge
 @app.post("/notes", response_model=NoteResponse)
 def create_note(note: NoteCreate):
     """Create a new note"""
@@ -506,7 +506,7 @@ async def transcribe_audio(
 # ----------------------
 # Summarization Endpoint
 # ----------------------
-
+#Summurization API and logic worked on by Jorge 
 @app.post("/summarize", response_model=SummaryResponse)
 def summarize_text_endpoint(req: TextRequest):
     """Summarize and categorize text"""

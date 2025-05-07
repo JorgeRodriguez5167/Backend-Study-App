@@ -6,6 +6,7 @@ from databases import engine
 from fastapi import HTTPException
 import logging
 from dotenv import load_dotenv
+#File worked on by Jorge Rdz
 
 # Load environment variables
 load_dotenv()
@@ -13,7 +14,7 @@ load_dotenv()
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Configure the Gemini API with your API key
+# Configure the Gemini API
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Check if the key was loaded successfully
@@ -59,10 +60,10 @@ def generate_study_guide(category: str, user_id: int):
         return f"No content found in notes for category: {category}"
     
     try:
-        # Initialize the Gemini model - using the latest flash model for efficiency
+        # Initialize the Gemini model 
         model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
-        # Create the prompt with clear instructions
+        # Create the prompt with clear instructions to create guide
         prompt = f"""
         Create a comprehensive study guide based on the following content. 
         Structure your response with these elements:

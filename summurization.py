@@ -1,12 +1,13 @@
 import google.generativeai as genai
 import os
-from dotenv import load_dotenv # Used to load variables from a .env file
+from dotenv import load_dotenv 
+
+#File workd on by Jorge
 
 # acessing environemnet for the key
 load_dotenv()
 
 # Retrieve the API key securely from environment variables
-# The actual key string is NOT written in this code.
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Check if the key was loaded successfully

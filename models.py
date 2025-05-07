@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime, date
 from sqlalchemy import Column, Text, String
 
+#This file worked on by Jorge
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str

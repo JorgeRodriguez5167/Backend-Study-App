@@ -5,7 +5,8 @@ MySQL Connection Test Script
 This script tests the connection to the MySQL database using the credentials
 from environment variables or provided as command-line arguments.
 """
-
+#File work on by Jorge
+#Used for error testing with database on Railway
 import os
 import sys
 import logging

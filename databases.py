@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, create_engine
 import os
 from pathlib import Path
 import logging
+#file worked on by Jorge to create database models and setting up database
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -14,6 +15,7 @@ mysql_user = os.environ.get("MYSQLUSER", "root")
 mysql_password = os.environ.get("MYSQLPASSWORD", "YJXnVfHQzvwQtLvDVZYjUlPoIOrZMcQP")
 mysql_database = os.environ.get("MYSQLDATABASE", "railway")
 
+#only set up for local development but was not rarely used after Mysql Deployement 
 # Check if we should use SQLite for local development
 use_sqlite = os.environ.get("USE_SQLITE", "False").lower() == "true"
 
